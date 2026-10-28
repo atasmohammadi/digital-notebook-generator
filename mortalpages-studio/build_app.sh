@@ -30,6 +30,7 @@ swiftc -O -parse-as-library \
     -framework Foundation \
     "${SCRIPT_DIR}/App/mortalpagesStudioApp.swift" \
     "${SCRIPT_DIR}/Models/NotebookTemplateMapping.swift" \
+    "${SCRIPT_DIR}/Models/ChapterNavIndicatorSettings.swift" \
     "${SCRIPT_DIR}/Models/NotebookConfig.swift" \
     "${SCRIPT_DIR}/Models/ThemePreset.swift" \
     "${SCRIPT_DIR}/Models/WatermarkSettings.swift" \

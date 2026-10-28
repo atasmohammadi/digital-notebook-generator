@@ -26,6 +26,9 @@ public struct NotebookConfig: Codable, Equatable {
     public var customArrowWidth: CGFloat
     public var customArrowHeight: CGFloat
     
+    // Page 2 Chapter Navigation & Arrow Indicator Settings
+    public var chapterNavSettings: ChapterNavIndicatorSettings
+    
     // Rich Watermark Settings
     public var watermarkSettings: WatermarkSettings
     
@@ -85,6 +88,7 @@ public struct NotebookConfig: Codable, Equatable {
         useSidebarSizeForArrows: Bool,
         customArrowWidth: CGFloat,
         customArrowHeight: CGFloat,
+        chapterNavSettings: ChapterNavIndicatorSettings = .defaultSettings,
         watermarkSettings: WatermarkSettings = .defaultSettings,
         templateMapping: NotebookTemplateMapping = .defaultMapping,
         autoCompressPDF: Bool = true,
@@ -110,6 +114,7 @@ public struct NotebookConfig: Codable, Equatable {
         self.useSidebarSizeForArrows = useSidebarSizeForArrows
         self.customArrowWidth = customArrowWidth
         self.customArrowHeight = customArrowHeight
+        self.chapterNavSettings = chapterNavSettings
         self.watermarkSettings = watermarkSettings
         self.templateMapping = templateMapping
         self.autoCompressPDF = autoCompressPDF
@@ -125,6 +130,7 @@ public struct NotebookConfig: Codable, Equatable {
         case hasCover, coverPageIndex, hasMasterLayout, masterLayoutPageIndex, excludeMasterLayoutFromOutput
         case sidebarWidth, skipSidebarStartPage, skipSidebarEndPage
         case hasChapterArrows, arrowTargets, useSidebarSizeForArrows, customArrowWidth, customArrowHeight
+        case chapterNavSettings
         case watermarkSettings, templateMapping
         case autoCompressPDF, targetMaxFileSizeMB, strictSizeEnforcement
         case stampWatermarkOnAllPages, watermarkX, watermarkY, watermarkWidth, watermarkHeight, neutralizeDataDetectors
@@ -157,6 +163,20 @@ public struct NotebookConfig: Codable, Equatable {
         self.autoCompressPDF = (try? container.decode(Bool.self, forKey: .autoCompressPDF)) ?? true
         self.targetMaxFileSizeMB = (try? container.decode(Double.self, forKey: .targetMaxFileSizeMB)) ?? 5.0
         self.strictSizeEnforcement = (try? container.decode(Bool.self, forKey: .strictSizeEnforcement)) ?? true
+        
+        if let nav = try? container.decode(ChapterNavIndicatorSettings.self, forKey: .chapterNavSettings) {
+            self.chapterNavSettings = nav
+        } else {
+            var nav = ChapterNavIndicatorSettings.defaultSettings
+            nav.isEnabled = (try? container.decode(Bool.self, forKey: .hasChapterArrows)) ?? true
+            if let customW = try? container.decode(CGFloat.self, forKey: .customArrowWidth) {
+                nav.width = customW
+            }
+            if let customH = try? container.decode(CGFloat.self, forKey: .customArrowHeight) {
+                nav.height = customH
+            }
+            self.chapterNavSettings = nav
+        }
         
         if let ws = try? container.decode(WatermarkSettings.self, forKey: .watermarkSettings) {
             self.watermarkSettings = ws
@@ -199,6 +219,7 @@ public struct NotebookConfig: Codable, Equatable {
         try container.encode(useSidebarSizeForArrows, forKey: .useSidebarSizeForArrows)
         try container.encode(customArrowWidth, forKey: .customArrowWidth)
         try container.encode(customArrowHeight, forKey: .customArrowHeight)
+        try container.encode(chapterNavSettings, forKey: .chapterNavSettings)
         try container.encode(generateInteractivePDF, forKey: .generateInteractivePDF)
         try container.encode(syncKeynotePresentation, forKey: .syncKeynotePresentation)
         
@@ -239,7 +260,68 @@ public struct NotebookConfig: Codable, Equatable {
             useSidebarSizeForArrows: true,
             customArrowWidth: 42.22,
             customArrowHeight: 101.51,
+            chapterNavSettings: .defaultSettings,
             watermarkSettings: .defaultSettings,
+            templateMapping: .defaultMapping,
+            autoCompressPDF: true,
+            targetMaxFileSizeMB: 5.0,
+            strictSizeEnforcement: true,
+            generateInteractivePDF: true,
+            syncKeynotePresentation: false
+        )
+    }
+    
+    public static var benitaPreset: NotebookConfig {
+        return NotebookConfig(
+            themeName: "Benita",
+            targetPDFPath: "/Users/sarahbenita/Library/Mobile Documents/com~apple~CloudDocs/digital business related/mortalpages/Notebook 6 - Glass  (Light)/Glass Notebook Portrait - Light (PDF from canva) embossed watermark.pdf",
+            templatePDFPath: "/Users/sarahbenita/Library/Mobile Documents/com~apple~CloudDocs/digital business related/mortalpages/Notebook 4 - pretty pastel/Pretty Pastel Portrait.pdf",
+            outputPath: "",
+            hasCover: true,
+            coverPageIndex: 1,
+            hasMasterLayout: true,
+            masterLayoutPageIndex: 2,
+            excludeMasterLayoutFromOutput: true,
+            sidebarWidth: 60.0,
+            skipSidebarStartPage: 3,
+            skipSidebarEndPage: 14,
+            hasChapterArrows: true,
+            arrowTargets: [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177],
+            useSidebarSizeForArrows: true,
+            customArrowWidth: 42.22,
+            customArrowHeight: 101.51,
+            chapterNavSettings: ChapterNavIndicatorSettings(
+                isEnabled: true,
+                renderVisualIndicator: false,
+                symbolType: .chevron,
+                customSymbolText: ">",
+                symbolColorHex: "#6E6864",
+                symbolColorAlpha: 0.85,
+                fontSize: 16,
+                fontWeight: "Bold",
+                capsuleStyle: .glass,
+                capsuleBgColorHex: "#FFFFFF",
+                capsuleBgAlpha: 0.65,
+                capsuleBorderColorHex: "#E0DCD6",
+                capsuleBorderAlpha: 0.5,
+                capsuleCornerRadius: 21.0,
+                positionX: 804.4,
+                width: 42.22,
+                height: 101.51,
+                linkLeftNumberPill: true,
+                leftNumberX: 33.5,
+                leftNumberWidth: 42.22,
+                leftNumberHeight: 101.51
+            ),
+            watermarkSettings: WatermarkSettings(
+                mode: .extractedFromLayout,
+                scope: .allPages,
+                layoutCropX: 501.0,
+                layoutCropY: 28.0,
+                layoutCropW: 150.0,
+                layoutCropH: 35.0,
+                neutralizeDataDetectors: true
+            ),
             templateMapping: .defaultMapping,
             autoCompressPDF: true,
             targetMaxFileSizeMB: 5.0,

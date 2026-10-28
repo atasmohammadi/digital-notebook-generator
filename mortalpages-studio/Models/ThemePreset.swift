@@ -31,6 +31,22 @@ public class PresetManager: ObservableObject {
         if let data = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode([ThemePreset].self, from: data), !decoded.isEmpty {
             self.presets = decoded
+            
+            // Ensure Benita preset is present and up to date
+            if let idx = self.presets.firstIndex(where: { $0.name.lowercased() == "benita" }) {
+                self.presets[idx] = ThemePreset(
+                    name: "Benita",
+                    description: "Glass Portrait Light with embossed watermark & synchronized dual chapter hyperlinks (Numbers 1-12 & End-of-Line Chevrons)",
+                    config: .benitaPreset
+                )
+            } else {
+                self.presets.insert(ThemePreset(
+                    name: "Benita",
+                    description: "Glass Portrait Light with embossed watermark & synchronized dual chapter hyperlinks (Numbers 1-12 & End-of-Line Chevrons)",
+                    config: .benitaPreset
+                ), at: 0)
+            }
+            savePresets()
         } else {
             // Default initial presets
             var lightConfig = NotebookConfig.standardMortalpages
@@ -46,6 +62,7 @@ public class PresetManager: ObservableObject {
             pastelConfig.themeName = "Pretty Pastel"
             
             self.presets = [
+                ThemePreset(name: "Benita", description: "Glass Portrait Light with embossed watermark & synchronized dual chapter hyperlinks (Numbers 1-12 & End-of-Line Chevrons)", config: .benitaPreset),
                 ThemePreset(name: "Glass Notebook (Light)", description: "Glass style with light transparent tabs", config: lightConfig),
                 ThemePreset(name: "Glass Notebook (Dark)", description: "Glass style with dark mode tabs", config: darkConfig),
                 ThemePreset(name: "Glass Notebook (Beige)", description: "Minimalist warm beige palette", config: beigeConfig),

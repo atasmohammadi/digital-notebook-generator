@@ -337,50 +337,317 @@ public struct LayoutConfigView: View {
                     .padding(8)
                 }
                 
-                // SECTION 3: Chapter Selection Arrows (Page 2)
-                GroupBox(label: Label("Chapter Selection Arrows (Page 2)", systemImage: "arrow.right.circle.fill")) {
-                    VStack(alignment: .leading, spacing: 14) {
+                // SECTION 3: Chapter Navigation & Arrow Indicators (Page 2)
+                GroupBox(label: Label("Chapter Navigation & Arrow Indicators (Page 2)", systemImage: "arrow.right.circle.fill")) {
+                    VStack(alignment: .leading, spacing: 16) {
                         GuideCallout(
-                            title: "Chapter Selection Arrows (Page 2)",
-                            whatItDoes: "Places invisible, high-precision vector hyperlink hitboxes over the 12 chapter buttons/arrows on Page 2.",
-                            howItWorks: "• Arrow Target Pages: Clicking arrow #1 jumps to Page 45 (Chapter 1), #2 jumps to Page 57 (Chapter 2), #3 jumps to Page 69 (Chapter 3), and so on in 12-page intervals.\n• Match Sidebar Tab Dimensions: When enabled, reuses standard 42.2 × 101.5 pt tab button hitbox coordinates. Disable to enter custom width and height if your arrow artwork has unique proportions.",
+                            title: "Page 2 Chapter Navigation & End-of-Line Arrow Customizer",
+                            whatItDoes: "Customizes interactive navigation on Page 2, linking both the left-side chapter numbers (1–12) and the customizable end-of-line navigation chevrons/arrows to the same chapter start pages.",
+                            howItWorks: "• Dual Synchronized Linking: Hyperlinks both the number pill on the left and the arrow on the right to Pages 45, 57, 69... in 12-page intervals.\n• Visual Rendering Toggle: Turn ON to render custom glass capsules and symbols directly onto the PDF. Turn OFF if your Canva artwork already has arrows drawn.\n• Full Customization: Customize symbol character (chevron, arrow, triangle, custom text), symbol color with hex inputs, capsule style (glass embossed, solid, outline, none), background colors, and sizing.",
                             icon: "arrow.right.circle.fill",
-                            tintColor: .indigo,
+                            tintColor: .purple,
                             isExpanded: false
                         )
                         
-                        Toggle("Enable 12 Chapter Arrow Hyperlinks", isOn: $config.hasChapterArrows)
-                        
-                        Toggle("Match Sidebar Tab Dimensions (42.2 x 101.5 pt)", isOn: $config.useSidebarSizeForArrows)
-                            .disabled(!config.hasChapterArrows)
-                        
-                        if !config.useSidebarSizeForArrows {
-                            HStack(spacing: 16) {
-                                HStack {
-                                    Text("Custom Width:")
-                                    TextField("Width", value: $config.customArrowWidth, formatter: NumberFormatter())
-                                        .frame(width: 60)
-                                        .textFieldStyle(.roundedBorder)
+                        // Main Toggles
+                        VStack(alignment: .leading, spacing: 10) {
+                            Toggle("Enable Page 2 Chapter Navigation", isOn: $config.hasChapterArrows)
+                                .fontWeight(.semibold)
+                            
+                            if config.hasChapterArrows {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Toggle("Link End-of-Line Navigation Indicators (to Pages 45, 57, 69...)", isOn: $config.chapterNavSettings.isEnabled)
+                                    
+                                    Toggle("Link Left-Side Chapter Numbers 1–12 (to Pages 45, 57, 69...)", isOn: $config.chapterNavSettings.linkLeftNumberPill)
+                                    
+                                    Toggle("Render Visual Arrow / Capsule onto PDF Page", isOn: $config.chapterNavSettings.renderVisualIndicator)
+                                    Text("Turn ON if your Canva design does NOT already have arrows drawn. Leave OFF if your artwork already has arrows drawn (like Canva pre-rendered art).")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                        .padding(.leading, 20)
                                 }
-                                HStack {
-                                    Text("Custom Height:")
-                                    TextField("Height", value: $config.customArrowHeight, formatter: NumberFormatter())
-                                        .frame(width: 60)
-                                        .textFieldStyle(.roundedBorder)
-                                }
+                                .padding(.leading, 12)
                             }
-                            .padding(.leading, 20)
                         }
                         
-                        VStack(alignment: .leading, spacing: 6) {
-                            Text("Arrow Chapter Target Pages (Chapters 1 to 12):")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            Text(config.arrowTargets.map { String($0) }.joined(separator: ", "))
-                                .font(.system(.body, design: .monospaced))
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlBackgroundColor)))
+                        if config.hasChapterArrows && config.chapterNavSettings.isEnabled {
+                            Divider()
+                            
+                            // Visual Live Preview Box
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("LIVE PREVIEW (PAGE 2 ROW)")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .foregroundColor(.secondary)
+                                
+                                HStack(spacing: 16) {
+                                    // Number Pill on Left
+                                    HStack {
+                                        Text("1")
+                                            .font(.system(size: 15, weight: .bold))
+                                            .foregroundColor(Color(hex: config.chapterNavSettings.symbolColorHex))
+                                    }
+                                    .frame(width: 32, height: 48)
+                                    .background(
+                                        Capsule().fill(Color(hex: config.chapterNavSettings.capsuleBgColorHex, alpha: config.chapterNavSettings.capsuleBgAlpha))
+                                    )
+                                    .overlay(
+                                        Capsule().strokeBorder(Color(hex: config.chapterNavSettings.capsuleBorderColorHex, alpha: config.chapterNavSettings.capsuleBorderAlpha), lineWidth: 1)
+                                    )
+                                    .shadow(color: Color.black.opacity(0.04), radius: 2, y: 1)
+                                    
+                                    // Horizontal Line
+                                    Rectangle()
+                                        .fill(Color.secondary.opacity(0.2))
+                                        .frame(height: 1)
+                                    
+                                    // Arrow Indicator on Right
+                                    HStack {
+                                        Text(config.chapterNavSettings.resolvedSymbolString)
+                                            .font(.system(size: config.chapterNavSettings.fontSize * 0.8, weight: config.chapterNavSettings.fontWeight == "Bold" ? .bold : .medium))
+                                            .foregroundColor(Color(hex: config.chapterNavSettings.symbolColorHex, alpha: config.chapterNavSettings.symbolColorAlpha))
+                                    }
+                                    .frame(width: 32, height: 48)
+                                    .background(
+                                        Group {
+                                            if config.chapterNavSettings.capsuleStyle != .none {
+                                                Capsule().fill(Color(hex: config.chapterNavSettings.capsuleBgColorHex, alpha: config.chapterNavSettings.capsuleBgAlpha))
+                                            }
+                                        }
+                                    )
+                                    .overlay(
+                                        Group {
+                                            if config.chapterNavSettings.capsuleStyle == .glass || config.chapterNavSettings.capsuleStyle == .outline {
+                                                Capsule().strokeBorder(Color(hex: config.chapterNavSettings.capsuleBorderColorHex, alpha: config.chapterNavSettings.capsuleBorderAlpha), lineWidth: 1)
+                                            }
+                                        }
+                                    )
+                                    .shadow(color: config.chapterNavSettings.capsuleStyle == .glass ? Color.black.opacity(0.04) : Color.clear, radius: 2, y: 1)
+                                }
+                                .padding(.horizontal, 20)
+                                .padding(.vertical, 14)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Color(NSColor.controlBackgroundColor)))
+                                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1))
+                                
+                                HStack {
+                                    Text("Both left number \"1\" and right arrow link to:")
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                    Text("Page 45 (Chapter 1)")
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.accentColor)
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            // Symbol & Icon Customization
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Arrow Symbol & Icon")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                
+                                HStack {
+                                    Text("Symbol Style:")
+                                        .frame(width: 120, alignment: .leading)
+                                    Picker("", selection: $config.chapterNavSettings.symbolType) {
+                                        ForEach(ChapterNavIndicatorSettings.IndicatorSymbol.allCases, id: \.self) { sym in
+                                            Text(sym.rawValue).tag(sym)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+                                
+                                if config.chapterNavSettings.symbolType == .custom {
+                                    HStack {
+                                        Text("Custom Text/Icon:")
+                                            .frame(width: 120, alignment: .leading)
+                                        TextField("e.g. > or → or GO", text: $config.chapterNavSettings.customSymbolText)
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(width: 140)
+                                    }
+                                }
+                                
+                                // Symbol Color & Hex
+                                HStack(spacing: 12) {
+                                    Text("Symbol Color:")
+                                        .frame(width: 120, alignment: .leading)
+                                    
+                                    ColorPicker("", selection: Binding(
+                                        get: { Color(hex: config.chapterNavSettings.symbolColorHex) },
+                                        set: { config.chapterNavSettings.symbolColorHex = $0.toHex() ?? config.chapterNavSettings.symbolColorHex }
+                                    ))
+                                    .labelsHidden()
+                                    
+                                    TextField("Hex", text: $config.chapterNavSettings.symbolColorHex)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(width: 90)
+                                    
+                                    Text("Opacity:")
+                                        .font(.caption)
+                                    Slider(value: $config.chapterNavSettings.symbolColorAlpha, in: 0.1...1.0, step: 0.05)
+                                        .frame(width: 80)
+                                    Text("\(Int(config.chapterNavSettings.symbolColorAlpha * 100))%")
+                                        .font(.caption)
+                                        .frame(width: 36)
+                                }
+                                
+                                HStack(spacing: 16) {
+                                    HStack {
+                                        Text("Font Size:")
+                                            .frame(width: 120, alignment: .leading)
+                                        Slider(value: $config.chapterNavSettings.fontSize, in: 10...30, step: 1)
+                                            .frame(width: 100)
+                                        Text("\(Int(config.chapterNavSettings.fontSize)) pt")
+                                            .font(.caption)
+                                    }
+                                    
+                                    HStack {
+                                        Text("Weight:")
+                                        Picker("", selection: $config.chapterNavSettings.fontWeight) {
+                                            Text("Regular").tag("Regular")
+                                            Text("Medium").tag("Medium")
+                                            Text("Semibold").tag("Semibold")
+                                            Text("Bold").tag("Bold")
+                                        }
+                                        .pickerStyle(.menu)
+                                        .frame(width: 110)
+                                    }
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            // Capsule / Pill Styling
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Capsule / Pill Badge Container")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                
+                                HStack {
+                                    Text("Capsule Style:")
+                                        .frame(width: 120, alignment: .leading)
+                                    Picker("", selection: $config.chapterNavSettings.capsuleStyle) {
+                                        ForEach(ChapterNavIndicatorSettings.CapsuleStyle.allCases, id: \.self) { style in
+                                            Text(style.rawValue).tag(style)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+                                
+                                if config.chapterNavSettings.capsuleStyle != .none {
+                                    HStack(spacing: 12) {
+                                        Text("Pill Fill Color:")
+                                            .frame(width: 120, alignment: .leading)
+                                        
+                                        ColorPicker("", selection: Binding(
+                                            get: { Color(hex: config.chapterNavSettings.capsuleBgColorHex) },
+                                            set: { config.chapterNavSettings.capsuleBgColorHex = $0.toHex() ?? config.chapterNavSettings.capsuleBgColorHex }
+                                        ))
+                                        .labelsHidden()
+                                        
+                                        TextField("Hex", text: $config.chapterNavSettings.capsuleBgColorHex)
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(width: 90)
+                                        
+                                        Text("Opacity:")
+                                            .font(.caption)
+                                        Slider(value: $config.chapterNavSettings.capsuleBgAlpha, in: 0.0...1.0, step: 0.05)
+                                            .frame(width: 80)
+                                        Text("\(Int(config.chapterNavSettings.capsuleBgAlpha * 100))%")
+                                            .font(.caption)
+                                            .frame(width: 36)
+                                    }
+                                    
+                                    HStack(spacing: 12) {
+                                        Text("Border Color:")
+                                            .frame(width: 120, alignment: .leading)
+                                        
+                                        ColorPicker("", selection: Binding(
+                                            get: { Color(hex: config.chapterNavSettings.capsuleBorderColorHex) },
+                                            set: { config.chapterNavSettings.capsuleBorderColorHex = $0.toHex() ?? config.chapterNavSettings.capsuleBorderColorHex }
+                                        ))
+                                        .labelsHidden()
+                                        
+                                        TextField("Hex", text: $config.chapterNavSettings.capsuleBorderColorHex)
+                                            .textFieldStyle(.roundedBorder)
+                                            .frame(width: 90)
+                                        
+                                        Text("Opacity:")
+                                            .font(.caption)
+                                        Slider(value: $config.chapterNavSettings.capsuleBorderAlpha, in: 0.0...1.0, step: 0.05)
+                                            .frame(width: 80)
+                                        Text("\(Int(config.chapterNavSettings.capsuleBorderAlpha * 100))%")
+                                            .font(.caption)
+                                            .frame(width: 36)
+                                    }
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            // Dimensions & Geometry
+                            VStack(alignment: .leading, spacing: 10) {
+                                Text("Dimensions & Coordinate Placement")
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                
+                                Toggle("Match Standard Sidebar Tab Dimensions (42.2 x 101.5 pt)", isOn: $config.useSidebarSizeForArrows)
+                                
+                                if !config.useSidebarSizeForArrows {
+                                    HStack(spacing: 16) {
+                                        HStack {
+                                            Text("Arrow Width:")
+                                            TextField("Width", value: $config.customArrowWidth, formatter: NumberFormatter())
+                                                .frame(width: 60)
+                                                .textFieldStyle(.roundedBorder)
+                                        }
+                                        HStack {
+                                            Text("Arrow Height:")
+                                            TextField("Height", value: $config.customArrowHeight, formatter: NumberFormatter())
+                                                .frame(width: 60)
+                                                .textFieldStyle(.roundedBorder)
+                                        }
+                                    }
+                                    .padding(.leading, 12)
+                                }
+                                
+                                HStack {
+                                    Text("Right Arrow X Position:")
+                                        .frame(width: 150, alignment: .leading)
+                                    TextField("X", value: $config.chapterNavSettings.positionX, formatter: NumberFormatter())
+                                        .frame(width: 80)
+                                        .textFieldStyle(.roundedBorder)
+                                    Text("pt (default 804.4)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                HStack {
+                                    Text("Left Number X Position:")
+                                        .frame(width: 150, alignment: .leading)
+                                    TextField("X", value: $config.chapterNavSettings.leftNumberX, formatter: NumberFormatter())
+                                        .frame(width: 80)
+                                        .textFieldStyle(.roundedBorder)
+                                    Text("pt (default 33.5)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            
+                            Divider()
+                            
+                            // Target pages
+                            VStack(alignment: .leading, spacing: 6) {
+                                Text("Chapter Destination Pages (Chapters 1 to 12):")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Text(config.arrowTargets.map { String($0) }.joined(separator: ", "))
+                                    .font(.system(.body, design: .monospaced))
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(RoundedRectangle(cornerRadius: 6).fill(Color(NSColor.controlBackgroundColor)))
+                            }
                         }
                     }
                     .padding(8)

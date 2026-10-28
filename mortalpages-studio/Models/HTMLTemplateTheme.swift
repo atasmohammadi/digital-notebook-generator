@@ -42,6 +42,14 @@ public struct HTMLTemplateTheme: Identifiable, Codable, Equatable {
         )
     }
     
+    public static var benita: HTMLTemplateTheme {
+        return HTMLTemplateTheme(
+            name: "Benita",
+            description: "Glass Portrait Light edition with embossed glass styling and pristine typography",
+            variables: glassLight.variables
+        )
+    }
+    
     public static var obsidianDark: HTMLTemplateTheme {
         return HTMLTemplateTheme(
             name: "Obsidian Dark Mode",
@@ -148,11 +156,18 @@ public class HTMLThemeManager: ObservableObject {
         if let data = try? Data(contentsOf: fileURL),
            let decoded = try? JSONDecoder().decode([HTMLTemplateTheme].self, from: data), !decoded.isEmpty {
             self.themes = decoded
-            if let first = decoded.first {
+            if let idx = self.themes.firstIndex(where: { $0.name.lowercased() == "benita" }) {
+                self.themes[idx] = .benita
+            } else {
+                self.themes.insert(.benita, at: 0)
+            }
+            if let first = self.themes.first {
                 self.activeTheme = first
             }
+            saveThemes()
         } else {
             self.themes = [
+                .benita,
                 .glassLight,
                 .obsidianDark,
                 .warmBeige,

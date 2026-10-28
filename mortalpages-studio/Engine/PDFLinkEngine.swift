@@ -2,6 +2,7 @@ import Foundation
 import PDFKit
 import CoreGraphics
 import AppKit
+import SwiftUI
 
 public class PDFLinkEngine {
     public static func process(config: NotebookConfig, progress: @escaping (Double, String) -> Void) throws -> (outputPath: String, linksCount: Int, duration: Double, fileSizeMB: Double) {
@@ -252,23 +253,43 @@ public class PDFLinkEngine {
                 }
             }
             
-            // Page 2: Chapter Selection Arrow Hitboxes
+            // Page 2: Chapter Selection Links & Arrow Indicators
             if finalPageNum == 2 && config.hasChapterArrows {
                 let sortedTabs = chapterTabBounds.sorted { $0.origin.y > $1.origin.y }
-                let arrowX: CGFloat = 804.4
+                let arrowX: CGFloat = config.chapterNavSettings.positionX
                 let arrowW: CGFloat = config.useSidebarSizeForArrows ? 42.22 : config.customArrowWidth
                 let arrowH: CGFloat = config.useSidebarSizeForArrows ? 101.51 : config.customArrowHeight
                 
                 for (idx, target) in config.arrowTargets.enumerated() {
-                    let arrowY: CGFloat
+                    let rowY: CGFloat
                     if idx < sortedTabs.count {
-                        arrowY = sortedTabs[idx].origin.y
+                        rowY = sortedTabs[idx].origin.y
                     } else {
-                        arrowY = 1276.0 - CGFloat(idx) * 105.0
+                        rowY = 1276.0 - CGFloat(idx) * 101.8
                     }
-                    let arrowRect = CGRect(x: arrowX - arrowW / 2.0, y: arrowY, width: arrowW, height: arrowH)
-                    writeContext.setDestination("page_\(target)" as CFString, for: arrowRect)
-                    totalLinks += 1
+                    
+                    // 1. End-of-line Arrow Link & Visual Rendering
+                    if config.chapterNavSettings.isEnabled {
+                        let arrowRect = CGRect(x: arrowX - arrowW / 2.0, y: rowY, width: arrowW, height: arrowH)
+                        
+                        if config.chapterNavSettings.renderVisualIndicator {
+                            drawChapterIndicator(on: writeContext, in: arrowRect, settings: config.chapterNavSettings)
+                        }
+                        
+                        writeContext.setDestination("page_\(target)" as CFString, for: arrowRect)
+                        totalLinks += 1
+                    }
+                    
+                    // 2. Left-side Chapter Number Link (Numbers 1..12)
+                    if config.chapterNavSettings.linkLeftNumberPill {
+                        let leftX = config.chapterNavSettings.leftNumberX
+                        let leftW = config.chapterNavSettings.leftNumberWidth
+                        let leftH = config.chapterNavSettings.leftNumberHeight
+                        let leftRect = CGRect(x: leftX - leftW / 2.0, y: rowY, width: leftW, height: leftH)
+                        
+                        writeContext.setDestination("page_\(target)" as CFString, for: leftRect)
+                        totalLinks += 1
+                    }
                 }
             }
             
@@ -324,5 +345,75 @@ public class PDFLinkEngine {
         if modified, let outData = pdfStr.data(using: .isoLatin1) {
             try? outData.write(to: URL(fileURLWithPath: path))
         }
+    }
+    
+    private static func drawChapterIndicator(on ctx: CGContext, in rect: CGRect, settings: ChapterNavIndicatorSettings) {
+        ctx.saveGState()
+        
+        let corner = min(rect.width, rect.height) / 2.0
+        let pillPath = CGPath(roundedRect: rect, cornerWidth: corner, cornerHeight: corner, transform: nil)
+        
+        // 1. Draw Capsule / Pill
+        switch settings.capsuleStyle {
+        case .glass:
+            let bgCol = NSColor(Color(hex: settings.capsuleBgColorHex, alpha: settings.capsuleBgAlpha))
+            ctx.addPath(pillPath)
+            ctx.setFillColor(bgCol.cgColor)
+            ctx.fillPath()
+            
+            let borderCol = NSColor(Color(hex: settings.capsuleBorderColorHex, alpha: settings.capsuleBorderAlpha))
+            ctx.addPath(pillPath)
+            ctx.setStrokeColor(borderCol.cgColor)
+            ctx.setLineWidth(1.0)
+            ctx.strokePath()
+            
+        case .solid:
+            let bgCol = NSColor(Color(hex: settings.capsuleBgColorHex, alpha: settings.capsuleBgAlpha))
+            ctx.addPath(pillPath)
+            ctx.setFillColor(bgCol.cgColor)
+            ctx.fillPath()
+            
+        case .outline:
+            let borderCol = NSColor(Color(hex: settings.capsuleBorderColorHex, alpha: settings.capsuleBorderAlpha))
+            ctx.addPath(pillPath)
+            ctx.setStrokeColor(borderCol.cgColor)
+            ctx.setLineWidth(1.5)
+            ctx.strokePath()
+            
+        case .none:
+            break
+        }
+        
+        // 2. Draw Symbol Text (e.g. ">", "→", etc.)
+        let symbolString = settings.resolvedSymbolString
+        let fontWeight: NSFont.Weight
+        switch settings.fontWeight {
+        case "Bold": fontWeight = .bold
+        case "Semibold": fontWeight = .semibold
+        case "Medium": fontWeight = .medium
+        default: fontWeight = .regular
+        }
+        let font = NSFont.systemFont(ofSize: settings.fontSize, weight: fontWeight)
+        let textColor = NSColor(Color(hex: settings.symbolColorHex, alpha: settings.symbolColorAlpha))
+        
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: font,
+            .foregroundColor: textColor
+        ]
+        let attrStr = NSAttributedString(string: symbolString, attributes: attrs)
+        let textSize = attrStr.size()
+        
+        let textOrigin = CGPoint(
+            x: rect.midX - textSize.width / 2.0,
+            y: rect.midY - textSize.height / 2.0
+        )
+        
+        NSGraphicsContext.saveGraphicsState()
+        let nctx = NSGraphicsContext(cgContext: ctx, flipped: false)
+        NSGraphicsContext.current = nctx
+        attrStr.draw(at: textOrigin)
+        NSGraphicsContext.restoreGraphicsState()
+        
+        ctx.restoreGState()
     }
 }
