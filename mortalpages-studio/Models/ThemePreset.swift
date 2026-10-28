@@ -62,11 +62,21 @@ public class PresetManager: ObservableObject {
     }
     
     public func addPreset(name: String, description: String, config: NotebookConfig) {
+        _ = addOrUpdatePreset(name: name, description: description, config: config)
+    }
+    
+    @discardableResult
+    public func addOrUpdatePreset(name: String, description: String, config: NotebookConfig) -> ThemePreset {
         var c = config
         c.themeName = name
         let preset = ThemePreset(name: name, description: description, config: c)
-        presets.append(preset)
+        if let idx = presets.firstIndex(where: { $0.name.lowercased() == name.lowercased() }) {
+            presets[idx] = preset
+        } else {
+            presets.append(preset)
+        }
         savePresets()
+        return preset
     }
     
     public func deletePreset(at offsets: IndexSet) {

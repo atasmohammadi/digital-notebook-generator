@@ -61,6 +61,18 @@ Technical Architecture Constraints:
     }
 }
 
+public struct GeneratedPresetData: Codable, Equatable {
+    public var name: String
+    public var description: String
+    public var variables: [String: String]
+    
+    public init(name: String, description: String, variables: [String: String]) {
+        self.name = name
+        self.description = description
+        self.variables = variables
+    }
+}
+
 public struct ChatMessage: Identifiable, Codable, Equatable {
     public var id: UUID
     public var role: MessageRole
@@ -69,6 +81,7 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
     public var extractedHTML: String?
     public var suggestedTemplateName: String?
     public var attachedImagePath: String?
+    public var extractedPreset: GeneratedPresetData?
     
     public enum MessageRole: String, Codable {
         case user = "user"
@@ -76,7 +89,16 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
         case system = "system"
     }
     
-    public init(id: UUID = UUID(), role: MessageRole, content: String, timestamp: Date = Date(), extractedHTML: String? = nil, suggestedTemplateName: String? = nil, attachedImagePath: String? = nil) {
+    public init(
+        id: UUID = UUID(),
+        role: MessageRole,
+        content: String,
+        timestamp: Date = Date(),
+        extractedHTML: String? = nil,
+        suggestedTemplateName: String? = nil,
+        attachedImagePath: String? = nil,
+        extractedPreset: GeneratedPresetData? = nil
+    ) {
         self.id = id
         self.role = role
         self.content = content
@@ -84,6 +106,7 @@ public struct ChatMessage: Identifiable, Codable, Equatable {
         self.extractedHTML = extractedHTML
         self.suggestedTemplateName = suggestedTemplateName
         self.attachedImagePath = attachedImagePath
+        self.extractedPreset = extractedPreset
     }
 }
 
@@ -214,9 +237,23 @@ What would you like to build today?
         saveSessions()
     }
     
-    public func addMessage(role: ChatMessage.MessageRole, content: String, extractedHTML: String? = nil, suggestedName: String? = nil, attachedImagePath: String? = nil) {
+    public func addMessage(
+        role: ChatMessage.MessageRole,
+        content: String,
+        extractedHTML: String? = nil,
+        suggestedName: String? = nil,
+        attachedImagePath: String? = nil,
+        extractedPreset: GeneratedPresetData? = nil
+    ) {
         var session = activeSession
-        let msg = ChatMessage(role: role, content: content, extractedHTML: extractedHTML, suggestedTemplateName: suggestedName, attachedImagePath: attachedImagePath)
+        let msg = ChatMessage(
+            role: role,
+            content: content,
+            extractedHTML: extractedHTML,
+            suggestedTemplateName: suggestedName,
+            attachedImagePath: attachedImagePath,
+            extractedPreset: extractedPreset
+        )
         session.messages.append(msg)
         session.updatedAt = Date()
         

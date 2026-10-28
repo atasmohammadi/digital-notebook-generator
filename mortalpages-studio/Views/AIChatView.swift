@@ -3,6 +3,12 @@ import AppKit
 
 public struct AIChatView: View {
     @ObservedObject public var chatManager: AIChatManager
+    public var presetManager: PresetManager?
+    public var themeManager: HTMLThemeManager?
+    @Binding public var config: NotebookConfig
+    public var onNavigateToStudio: ((String?) -> Void)? = nil
+    public var onNavigateToPresets: (() -> Void)? = nil
+    
     @ObservedObject private var bridge = AIAgentBridge.shared
     @ObservedObject private var registry = TemplateRegistry.shared
     
@@ -21,12 +27,20 @@ public struct AIChatView: View {
     @State private var attachedImageName: String = ""
     @State private var isTargetedForDrop: Bool = false
     
-    // Callback to jump to Template Studio if needed
-    public var onNavigateToStudio: ((String?) -> Void)? = nil
-    
-    public init(chatManager: AIChatManager, onNavigateToStudio: ((String?) -> Void)? = nil) {
+    public init(
+        chatManager: AIChatManager,
+        presetManager: PresetManager? = nil,
+        themeManager: HTMLThemeManager? = nil,
+        config: Binding<NotebookConfig>,
+        onNavigateToStudio: ((String?) -> Void)? = nil,
+        onNavigateToPresets: (() -> Void)? = nil
+    ) {
         self.chatManager = chatManager
+        self.presetManager = presetManager
+        self.themeManager = themeManager
+        self._config = config
         self.onNavigateToStudio = onNavigateToStudio
+        self.onNavigateToPresets = onNavigateToPresets
     }
     
     public var body: some View {
@@ -287,6 +301,11 @@ public struct AIChatView: View {
                 if let html = message.extractedHTML, !html.isEmpty {
                     templateCodeCard(html: html, suggestedName: message.suggestedTemplateName)
                 }
+                
+                // Extracted Theme Preset Card if available
+                if let preset = message.extractedPreset {
+                    presetCard(preset: preset)
+                }
             }
             
             if message.role == .user {
@@ -382,6 +401,27 @@ public struct AIChatView: View {
         .cornerRadius(10)
     }
     
+    // MARK: - Generated Theme Preset Card
+    @ViewBuilder
+    private func presetCard(preset: GeneratedPresetData) -> some View {
+        AIGeneratedPresetCard(
+            preset: preset,
+            isCurrentActive: config.themeName == preset.name,
+            onApply: {
+                applyGeneratedPreset(preset)
+            },
+            onOpenStudio: {
+                applyGeneratedPreset(preset)
+                onNavigateToStudio?(nil)
+            },
+            onCopyCSS: {
+                let css = generateCSSTokens(from: preset.variables)
+                copyToClipboard(css)
+                savedTemplateSuccess = "Theme CSS variables copied to clipboard!"
+            }
+        )
+    }
+    
     // MARK: - In-flight Loading Indicator
     private var inFlightIndicator: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -432,6 +472,18 @@ public struct AIChatView: View {
     private var quickPromptChipsBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                chipButton(icon: "sparkles", label: "🎃 Halloween Spooky Theme") {
+                    sendQuickPrompt("Create a preset with Halloween theme: dark obsidian canvas, pumpkin orange accents, midnight purple tabs, and ghostly green lines.")
+                }
+                
+                chipButton(icon: "leaf.fill", label: "🍂 Autumn Harvest Preset") {
+                    sendQuickPrompt("Create an Autumn Harvest theme preset with warm honey canvas, burnt orange accents, and rustic walnut tabs.")
+                }
+                
+                chipButton(icon: "bolt.fill", label: "🌌 Cyberpunk Neon Theme") {
+                    sendQuickPrompt("Create a Cyberpunk Neon theme preset with ultra dark canvas, electric cyan accents, and hot magenta tabs.")
+                }
+                
                 chipButton(icon: "calendar", label: "Half Calendar + Daily Notes") {
                     sendQuickPrompt("Create a daily template where the top half is an interactive mini-calendar & schedule, and the bottom half has 3 columns: Top Priorities, Notes, and Gratitude.")
                 }
@@ -442,14 +494,6 @@ public struct AIChatView: View {
                 
                 chipButton(icon: "text.book.closed", label: "Cornell Notes Layout") {
                     sendQuickPrompt("Design a professional Cornell note-taking template with a 2.5-inch cue/keyword column on the left, lined notes area on the right, and a summary block at the bottom.")
-                }
-                
-                chipButton(icon: "target", label: "Weekly Habit & Workout Tracker") {
-                    sendQuickPrompt("Create a weekly fitness & habit tracker template with checkboxes for 7 days, water intake counter, sleep tracker, and workout log.")
-                }
-                
-                chipButton(icon: "paintpalette", label: "Refine Current Template Styling") {
-                    sendQuickPrompt("Analyze the currently active template and improve its typography, visual hierarchy, line contrast, and add aesthetic subtle borders.")
                 }
             }
             .padding(.horizontal, 16)
@@ -625,10 +669,16 @@ public struct AIChatView: View {
                     role: .assistant,
                     content: execResult.output,
                     extractedHTML: formattedHTML,
-                    suggestedName: execResult.suggestedTitle
+                    suggestedName: execResult.suggestedTitle,
+                    extractedPreset: execResult.extractedPreset
                 )
                 
-                // Auto-apply if configured
+                // Auto-apply preset if returned (activates completely by itself!)
+                if let preset = execResult.extractedPreset {
+                    self.applyGeneratedPreset(preset)
+                }
+                
+                // Auto-apply template if configured
                 if self.chatManager.config.autoApplyChanges, let html = formattedHTML {
                     let title = execResult.suggestedTitle ?? "AI Custom Template"
                     _ = self.saveAsCustomTemplate(title: title, html: html)
@@ -720,6 +770,37 @@ public struct AIChatView: View {
         activeCSSTokens = (try? String(contentsOf: cssURL, encoding: .utf8)) ?? ""
     }
     
+    private func applyGeneratedPreset(_ preset: GeneratedPresetData) {
+        // 1. Add/Update in PresetManager
+        if let pm = presetManager {
+            var newConfig = config
+            newConfig.themeName = preset.name
+            _ = pm.addOrUpdatePreset(name: preset.name, description: preset.description, config: newConfig)
+        }
+        
+        // 2. Add/Update in HTMLThemeManager
+        if let tm = themeManager {
+            let theme = tm.addOrUpdateTheme(name: preset.name, description: preset.description, variables: preset.variables)
+            tm.activeTheme = theme
+        }
+        
+        // 3. Update active notebook config theme
+        config.themeName = preset.name
+        
+        withAnimation {
+            self.savedTemplateSuccess = "✓ Activated \"\(preset.name)\" preset! Live preview & PDF compiler updated."
+        }
+    }
+    
+    private func generateCSSTokens(from vars: [String: String]) -> String {
+        var str = ":root {\n"
+        for key in vars.keys.sorted() {
+            str += "  \(key): \(vars[key] ?? "");\n"
+        }
+        str += "}\n"
+        return str
+    }
+    
     private func copyToClipboard(_ text: String) {
         NSPasteboard.general.clearContents()
         NSPasteboard.general.setString(text, forType: .string)
@@ -735,5 +816,166 @@ public struct AIChatView: View {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+}
+
+// MARK: - Standalone Preset Card View
+public struct AIGeneratedPresetCard: View {
+    public let preset: GeneratedPresetData
+    public let isCurrentActive: Bool
+    public let onApply: () -> Void
+    public let onOpenStudio: () -> Void
+    public let onCopyCSS: () -> Void
+    
+    public init(
+        preset: GeneratedPresetData,
+        isCurrentActive: Bool,
+        onApply: @escaping () -> Void,
+        onOpenStudio: @escaping () -> Void,
+        onCopyCSS: @escaping () -> Void
+    ) {
+        self.preset = preset
+        self.isCurrentActive = isCurrentActive
+        self.onApply = onApply
+        self.onOpenStudio = onOpenStudio
+        self.onCopyCSS = onCopyCSS
+    }
+    
+    public var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            headerRow
+            Divider()
+            paletteSection
+            Divider()
+            actionsRow
+        }
+        .padding(14)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.85))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(isCurrentActive ? Color.green.opacity(0.4) : Color.accentColor.opacity(0.3), lineWidth: 1.5)
+        )
+        .cornerRadius(10)
+    }
+    
+    private var headerRow: some View {
+        HStack(spacing: 10) {
+            ZStack {
+                let accentHex = preset.variables["--accent-color"] ?? "#FF7518"
+                LinearGradient(
+                    colors: [Color(hex: accentHex), Color.purple],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                Image(systemName: "paintpalette.fill")
+                    .foregroundColor(.white)
+                    .font(.system(size: 14, weight: .bold))
+            }
+            .frame(width: 36, height: 36)
+            .cornerRadius(8)
+            
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(preset.name)
+                        .font(.headline)
+                        .fontWeight(.bold)
+                    
+                    if isCurrentActive {
+                        Text("ACTIVE THEME")
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.green.opacity(0.2)))
+                            .foregroundColor(.green)
+                    } else {
+                        Text("SAVED TO PRESETS")
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color.accentColor.opacity(0.2)))
+                            .foregroundColor(.accentColor)
+                    }
+                }
+                
+                Text(preset.description)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(2)
+            }
+            
+            Spacer()
+            
+            if isCurrentActive {
+                Button(action: onApply) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark")
+                        Text("Active")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            } else {
+                Button(action: onApply) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "bolt.fill")
+                        Text("Apply Theme")
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.small)
+            }
+        }
+    }
+    
+    private var paletteSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Theme Palette Swatches:")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+            
+            HStack(spacing: 8) {
+                swatchItem(name: "Canvas", hex: preset.variables["--page-bg"] ?? "#FAF8F5")
+                swatchItem(name: "Accent", hex: preset.variables["--accent-color"] ?? "#FF7518")
+                swatchItem(name: "Text", hex: preset.variables["--text-main"] ?? "#3C3835")
+                swatchItem(name: "Active Tab", hex: preset.variables["--tab-active-bg"] ?? "#FF7518")
+                swatchItem(name: "Tabs", hex: preset.variables["--tab-bg"] ?? "rgba(60, 56, 53, 0.1)")
+                swatchItem(name: "Rules", hex: preset.variables["--grid-color"] ?? "rgba(60, 56, 53, 0.08)")
+            }
+        }
+    }
+    
+    private func swatchItem(name: String, hex: String) -> some View {
+        VStack(spacing: 3) {
+            RoundedRectangle(cornerRadius: 4)
+                .fill(Color(hex: hex))
+                .frame(width: 44, height: 26)
+                .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.secondary.opacity(0.35), lineWidth: 1))
+            
+            Text(name)
+                .font(.system(size: 9))
+                .foregroundColor(.secondary)
+        }
+    }
+    
+    private var actionsRow: some View {
+        HStack(spacing: 8) {
+            Button(action: onOpenStudio) {
+                Label("View in Template Studio", systemImage: "paintbrush.pointed")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            
+            Button(action: onCopyCSS) {
+                Label("Copy CSS Tokens", systemImage: "doc.on.doc")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            
+            Spacer()
+            
+            Text("\(preset.variables.count) CSS tokens • 1-Click Design System")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
     }
 }

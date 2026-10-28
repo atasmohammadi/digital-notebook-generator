@@ -115,10 +115,19 @@ public struct MainAppView: View {
                         }
                     )
                 case .aiChat:
-                    AIChatView(chatManager: chatManager) { newTemplatePath in
-                        studioInitialTemplate = newTemplatePath
-                        selectedTab = .templateStudio
-                    }
+                    AIChatView(
+                        chatManager: chatManager,
+                        presetManager: presetManager,
+                        themeManager: themeManager,
+                        config: $config,
+                        onNavigateToStudio: { newTemplatePath in
+                            studioInitialTemplate = newTemplatePath
+                            selectedTab = .templateStudio
+                        },
+                        onNavigateToPresets: {
+                            selectedTab = .presets
+                        }
+                    )
                 case .layout:
                     LayoutConfigView(config: $config)
                 case .watermark:

@@ -178,6 +178,19 @@ public class HTMLThemeManager: ObservableObject {
         saveThemes()
     }
     
+    @discardableResult
+    public func addOrUpdateTheme(name: String, description: String, variables: [String: String]) -> HTMLTemplateTheme {
+        let newTheme = HTMLTemplateTheme(name: name, description: description, variables: variables)
+        if let idx = themes.firstIndex(where: { $0.name.lowercased() == name.lowercased() }) {
+            themes[idx] = newTheme
+        } else {
+            themes.append(newTheme)
+        }
+        activeTheme = newTheme
+        saveThemes()
+        return newTheme
+    }
+    
     public func updateActiveThemeVariables(_ vars: [String: String]) {
         activeTheme.variables = vars
         if let idx = themes.firstIndex(where: { $0.id == activeTheme.id }) {
