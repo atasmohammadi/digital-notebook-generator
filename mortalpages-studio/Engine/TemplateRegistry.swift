@@ -63,6 +63,7 @@ public class TemplateRegistry: ObservableObject {
                 var icon = defaultIcon
                 if relPath.contains("template_list") { icon = "list.bullet.rectangle.portrait" }
                 else if relPath.contains("chapter_selection") { icon = "square.grid.2x2" }
+                else if relPath.contains("subchapter_selection") { icon = "square.grid.3x3" }
                 else if relPath.contains("master_layout") { icon = "sidebar.left" }
                 
                 let t = DynamicTemplate(

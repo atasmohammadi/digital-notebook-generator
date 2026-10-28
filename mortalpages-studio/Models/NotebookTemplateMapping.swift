@@ -48,13 +48,44 @@ public struct NotebookTemplateMapping: Codable, Equatable {
     public init(
         coverTemplate: String = "Covers/cover_minimalist.html",
         chapterSelectionTemplate: String = "Navigation/chapter_selection.html",
-        chapterDividerTemplate: String = "Navigation/chapter_selection.html",
+        chapterDividerTemplate: String = "Navigation/subchapter_selection.html",
         templateListTemplate: String = "Navigation/template_list.html",
         generalTemplates: [String] = [
+            // Grids (Pages 16..20)
             "Grids/full_grid.html",
+            "Grids/blank_grid.html",
+            "Grids/blank_grid.html",
+            "Grids/blank_grid.html",
+            "Grids/blank_grid.html",
+            // Lined (Pages 21..25)
             "Lined/medium_line.html",
+            "Lined/medium_line.html",
+            "Lined/medium_line.html",
+            "Lined/medium_line.html",
+            "Grids/full_grid.html",
+            // Dotted & Blank (Pages 26..29)
             "Dotted/full_dotted.html",
-            "Planners/monthly_calendar_notes.html"
+            "Dotted/full_dotted.html",
+            "Dotted/full_dotted.html",
+            "Grids/blank_grid.html",
+            // Monthly Planners (Pages 30..35)
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            // Weekly Planners (Pages 36..42)
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            "Planners/monthly_calendar_notes.html",
+            // Trackers (Pages 43..44)
+            "Trackers/habit_yearly_grid.html",
+            "Trackers/habit_yearly_grid.html"
         ],
         subchapterCoverTemplate: String = "Trackers/habit_yearly_grid.html",
         defaultNotesTemplate: String = "Lined/medium_line.html",
@@ -97,6 +128,10 @@ public struct NotebookTemplateMapping: Codable, Equatable {
         
         // 4. Pages 3..14: Subchapter Selection / Dividers
         if p >= 3 && p <= 14 {
+            let currentCh = p - 2
+            if chapterDividerTemplate == "Navigation/subchapter_selection.html" {
+                return "Navigation/subchapter_selection_\(currentCh).html"
+            }
             return chapterDividerTemplate
         }
         
