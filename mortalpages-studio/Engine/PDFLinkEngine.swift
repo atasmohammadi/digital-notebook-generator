@@ -31,7 +31,9 @@ public class PDFLinkEngine {
         let sidebarWidth: CGFloat = config.sidebarWidth
         let sidebarCropRect = CGRect(x: 0, y: 0, width: sidebarWidth, height: masterBounds.height)
         
-        let renderScale: CGFloat = 3.0 // High DPI vector fidelity
+        // Adaptive render scale based on compression profile
+        let compressionProfile = PDFCompressor.profileFor(targetMB: config.targetMaxFileSizeMB)
+        let renderScale: CGFloat = config.autoCompressPDF ? compressionProfile.sidebarScale : 3.0
         let pixelW = Int(sidebarCropRect.width * renderScale)
         let pixelH = Int(sidebarCropRect.height * renderScale)
         
@@ -47,7 +49,16 @@ public class PDFLinkEngine {
         cg.scaleBy(x: renderScale, y: renderScale)
         masterPage.draw(with: .mediaBox, to: cg)
         NSGraphicsContext.restoreGraphicsState()
-        guard let sidebarCG = repSidebar.cgImage else {
+        
+        let sidebarCG: CGImage
+        if config.autoCompressPDF,
+           let jpegData = repSidebar.representation(using: .jpeg, properties: [.compressionFactor: NSNumber(value: Float(compressionProfile.quality))]),
+           let src = CGImageSourceCreateWithData(jpegData as CFData, nil),
+           let img = CGImageSourceCreateImageAtIndex(src, 0, nil) {
+            sidebarCG = img
+        } else if let img = repSidebar.cgImage {
+            sidebarCG = img
+        } else {
             throw NSError(domain: "StudioEngine", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to render master sidebar image."])
         }
         
@@ -160,6 +171,9 @@ public class PDFLinkEngine {
             outPath = dir.appendingPathComponent("\(base) - INTERACTIVE.pdf").path
         }
         
+        let totalCanvaPages = cgPDFDoc.numberOfPages
+        let totalFinalPages = config.excludeMasterLayoutFromOutput ? (totalCanvaPages - 1) : totalCanvaPages
+        
         progress(0.40, "Assembling vector pages & applying overlays...")
         let pdfURL = URL(fileURLWithPath: outPath) as CFURL
         var mediaBox = CGRect(origin: .zero, size: masterBounds.size)
@@ -167,13 +181,18 @@ public class PDFLinkEngine {
             throw NSError(domain: "StudioEngine", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to create destination PDF."])
         }
         
+        // Attach QuartzFilter to initial write context if compression is enabled
+        if config.autoCompressPDF && config.targetMaxFileSizeMB < 50.0 {
+            if let qf = PDFCompressor.createQuartzFilter(targetMB: config.targetMaxFileSizeMB, pageCount: totalFinalPages) {
+                qf.apply(to: writeContext)
+            }
+        }
+        
         let tBox = templateDoc.page(at: 1)?.bounds(for: .mediaBox) ?? CGRect(x: 0, y: 0, width: 1536, height: 1980)
         let sx: CGFloat = masterBounds.width / tBox.width
         let sy: CGFloat = masterBounds.height / tBox.height
         
         var totalLinks = 0
-        let totalCanvaPages = cgPDFDoc.numberOfPages
-        let totalFinalPages = config.excludeMasterLayoutFromOutput ? (totalCanvaPages - 1) : totalCanvaPages
         
         // Page 1: Cover
         if config.hasCover, let coverPage = cgPDFDoc.page(at: config.coverPageIndex) {
@@ -265,15 +284,28 @@ public class PDFLinkEngine {
         
         // 4. Neutralize Preview Data Detectors (if enabled)
         if config.watermarkSettings.neutralizeDataDetectors {
-            progress(0.92, "Suppressing Preview URL data detectors...")
+            progress(0.90, "Suppressing Preview URL data detectors...")
             suppressDataDetectorsInFile(at: outPath)
         }
         
-        let duration = Date().timeIntervalSince(startTime)
-        let fileSizeMB = (try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Double) ?? 0.0 / (1024.0 * 1024.0)
+        // 5. Automatic Target Size Compression Check & Enforcement
+        let rawBytes = (try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Double) ?? 0.0
+        var finalFileSizeMB = rawBytes / (1024.0 * 1024.0)
         
-        progress(1.0, "Ready! Processed \(totalFinalPages) pages with \(totalLinks) links in \(String(format: "%.2f", duration))s.")
-        return (outputPath: outPath, linksCount: totalLinks, duration: duration, fileSizeMB: fileSizeMB / (1024.0 * 1024.0))
+        if config.autoCompressPDF && config.targetMaxFileSizeMB < 50.0 && finalFileSizeMB > config.targetMaxFileSizeMB {
+            progress(0.92, "Optimizing file size (\(String(format: "%.1f", finalFileSizeMB)) MB -> target ≤ \(String(format: "%.1f", config.targetMaxFileSizeMB)) MB)...")
+            let compressedMB = PDFCompressor.compressPDFFile(
+                inputPath: outPath,
+                outputPath: outPath,
+                targetMB: config.targetMaxFileSizeMB,
+                progress: progress
+            )
+            finalFileSizeMB = compressedMB
+        }
+        
+        let duration = Date().timeIntervalSince(startTime)
+        progress(1.0, "Ready! Processed \(totalFinalPages) pages with \(totalLinks) links (\(String(format: "%.2f", finalFileSizeMB)) MB) in \(String(format: "%.2f", duration))s.")
+        return (outputPath: outPath, linksCount: totalLinks, duration: duration, fileSizeMB: finalFileSizeMB)
     }
     
     private static func suppressDataDetectorsInFile(at path: String) {

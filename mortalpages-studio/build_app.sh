@@ -25,6 +25,7 @@ swiftc -O -parse-as-library \
     -framework AppKit \
     -framework PDFKit \
     -framework CoreGraphics \
+    -framework Quartz \
     -framework WebKit \
     -framework Foundation \
     "${SCRIPT_DIR}/App/mortalpagesStudioApp.swift" \
@@ -35,6 +36,7 @@ swiftc -O -parse-as-library \
     "${SCRIPT_DIR}/Models/HTMLTemplateTheme.swift" \
     "${SCRIPT_DIR}/Models/AIChatSession.swift" \
     "${SCRIPT_DIR}/Engine/KeynoteBridge.swift" \
+    "${SCRIPT_DIR}/Engine/PDFCompressor.swift" \
     "${SCRIPT_DIR}/Engine/PDFLinkEngine.swift" \
     "${SCRIPT_DIR}/Engine/WatermarkRenderer.swift" \
     "${SCRIPT_DIR}/Engine/WebKitPreviewView.swift" \

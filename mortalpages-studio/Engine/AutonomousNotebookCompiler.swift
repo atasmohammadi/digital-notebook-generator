@@ -12,19 +12,25 @@ public class AutonomousNotebookCompiler {
         public var templateMapping: NotebookTemplateMapping
         public var totalPages: Int // Default 188
         public var outputPath: String
+        public var autoCompressPDF: Bool
+        public var targetMaxFileSizeMB: Double
         
         public init(
             theme: HTMLTemplateTheme = .glassLight,
             watermarkSettings: WatermarkSettings = .defaultSettings,
             templateMapping: NotebookTemplateMapping = .defaultMapping,
             totalPages: Int = 188,
-            outputPath: String = ""
+            outputPath: String = "",
+            autoCompressPDF: Bool = true,
+            targetMaxFileSizeMB: Double = 5.0
         ) {
             self.theme = theme
             self.watermarkSettings = watermarkSettings
             self.templateMapping = templateMapping
             self.totalPages = totalPages
             self.outputPath = outputPath
+            self.autoCompressPDF = autoCompressPDF
+            self.targetMaxFileSizeMB = targetMaxFileSizeMB
         }
     }
     
@@ -96,6 +102,13 @@ public class AutonomousNotebookCompiler {
         var mediaBox = CGRect(x: 0, y: 0, width: 1152, height: 1485)
         guard let writeContext = CGContext(pdfURL, mediaBox: &mediaBox, nil) else {
             throw NSError(domain: "Compiler", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to initialize master PDF context."])
+        }
+        
+        // Attach QuartzFilter to master context if auto-compression enabled
+        if options.autoCompressPDF && options.targetMaxFileSizeMB < 50.0 {
+            if let qf = PDFCompressor.createQuartzFilter(targetMB: options.targetMaxFileSizeMB, pageCount: options.totalPages) {
+                qf.apply(to: writeContext)
+            }
         }
         
         // 4. Preload HTML Template Files
@@ -314,10 +327,23 @@ public class AutonomousNotebookCompiler {
             }
         }
         
-        let duration = Date().timeIntervalSince(startTime)
-        let fileSizeMB = ((try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Double) ?? 0.0) / (1024.0 * 1024.0)
+        // 7. Enforce Target File Size Compression
+        let rawBytes = ((try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Double) ?? 0.0)
+        var finalFileSizeMB = rawBytes / (1024.0 * 1024.0)
         
-        progress(1.0, "Ready! Autonomous notebook generated with \(totalPages) pages and \(totalLinks) links in \(String(format: "%.1f", duration))s.")
-        return (outputPath: outPath, linksCount: totalLinks, duration: duration, fileSizeMB: fileSizeMB)
+        if options.autoCompressPDF && options.targetMaxFileSizeMB < 50.0 && finalFileSizeMB > options.targetMaxFileSizeMB {
+            progress(0.96, "Optimizing file size (\(String(format: "%.1f", finalFileSizeMB)) MB -> target ≤ \(String(format: "%.1f", options.targetMaxFileSizeMB)) MB)...")
+            let compressedMB = PDFCompressor.compressPDFFile(
+                inputPath: outPath,
+                outputPath: outPath,
+                targetMB: options.targetMaxFileSizeMB,
+                progress: progress
+            )
+            finalFileSizeMB = compressedMB
+        }
+        
+        let duration = Date().timeIntervalSince(startTime)
+        progress(1.0, "Ready! Autonomous notebook generated with \(totalPages) pages and \(totalLinks) links (\(String(format: "%.2f", finalFileSizeMB)) MB) in \(String(format: "%.1f", duration))s.")
+        return (outputPath: outPath, linksCount: totalLinks, duration: duration, fileSizeMB: finalFileSizeMB)
     }
 }

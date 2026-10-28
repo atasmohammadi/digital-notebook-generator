@@ -726,7 +726,9 @@ public struct TemplateStudioView: View {
             theme: themeManager.activeTheme,
             watermarkSettings: notebookConfig.watermarkSettings,
             templateMapping: notebookConfig.templateMapping,
-            totalPages: 188
+            totalPages: 188,
+            autoCompressPDF: notebookConfig.autoCompressPDF,
+            targetMaxFileSizeMB: notebookConfig.targetMaxFileSizeMB
         )
         
         DispatchQueue.global(qos: .userInitiated).async {

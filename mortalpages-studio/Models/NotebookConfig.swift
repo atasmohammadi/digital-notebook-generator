@@ -32,6 +32,11 @@ public struct NotebookConfig: Codable, Equatable {
     // Page & Section Template Mapping
     public var templateMapping: NotebookTemplateMapping
     
+    // Output Compression & Quality Optimization
+    public var autoCompressPDF: Bool
+    public var targetMaxFileSizeMB: Double
+    public var strictSizeEnforcement: Bool
+    
     // Legacy convenience properties
     public var stampWatermarkOnAllPages: Bool {
         get { watermarkSettings.mode != .none }
@@ -82,6 +87,9 @@ public struct NotebookConfig: Codable, Equatable {
         customArrowHeight: CGFloat,
         watermarkSettings: WatermarkSettings = .defaultSettings,
         templateMapping: NotebookTemplateMapping = .defaultMapping,
+        autoCompressPDF: Bool = true,
+        targetMaxFileSizeMB: Double = 5.0,
+        strictSizeEnforcement: Bool = true,
         generateInteractivePDF: Bool,
         syncKeynotePresentation: Bool
     ) {
@@ -104,6 +112,9 @@ public struct NotebookConfig: Codable, Equatable {
         self.customArrowHeight = customArrowHeight
         self.watermarkSettings = watermarkSettings
         self.templateMapping = templateMapping
+        self.autoCompressPDF = autoCompressPDF
+        self.targetMaxFileSizeMB = targetMaxFileSizeMB
+        self.strictSizeEnforcement = strictSizeEnforcement
         self.generateInteractivePDF = generateInteractivePDF
         self.syncKeynotePresentation = syncKeynotePresentation
     }
@@ -115,6 +126,7 @@ public struct NotebookConfig: Codable, Equatable {
         case sidebarWidth, skipSidebarStartPage, skipSidebarEndPage
         case hasChapterArrows, arrowTargets, useSidebarSizeForArrows, customArrowWidth, customArrowHeight
         case watermarkSettings, templateMapping
+        case autoCompressPDF, targetMaxFileSizeMB, strictSizeEnforcement
         case stampWatermarkOnAllPages, watermarkX, watermarkY, watermarkWidth, watermarkHeight, neutralizeDataDetectors
         case generateInteractivePDF, syncKeynotePresentation
     }
@@ -142,6 +154,9 @@ public struct NotebookConfig: Codable, Equatable {
         syncKeynotePresentation = try container.decode(Bool.self, forKey: .syncKeynotePresentation)
         
         self.templateMapping = (try? container.decode(NotebookTemplateMapping.self, forKey: .templateMapping)) ?? .defaultMapping
+        self.autoCompressPDF = (try? container.decode(Bool.self, forKey: .autoCompressPDF)) ?? true
+        self.targetMaxFileSizeMB = (try? container.decode(Double.self, forKey: .targetMaxFileSizeMB)) ?? 5.0
+        self.strictSizeEnforcement = (try? container.decode(Bool.self, forKey: .strictSizeEnforcement)) ?? true
         
         if let ws = try? container.decode(WatermarkSettings.self, forKey: .watermarkSettings) {
             self.watermarkSettings = ws
@@ -189,6 +204,9 @@ public struct NotebookConfig: Codable, Equatable {
         
         try container.encode(watermarkSettings, forKey: .watermarkSettings)
         try container.encode(templateMapping, forKey: .templateMapping)
+        try container.encode(autoCompressPDF, forKey: .autoCompressPDF)
+        try container.encode(targetMaxFileSizeMB, forKey: .targetMaxFileSizeMB)
+        try container.encode(strictSizeEnforcement, forKey: .strictSizeEnforcement)
         // Also encode legacy fields for backwards compatibility
         try container.encode(stampWatermarkOnAllPages, forKey: .stampWatermarkOnAllPages)
         try container.encode(watermarkX, forKey: .watermarkX)
@@ -223,6 +241,9 @@ public struct NotebookConfig: Codable, Equatable {
             customArrowHeight: 101.51,
             watermarkSettings: .defaultSettings,
             templateMapping: .defaultMapping,
+            autoCompressPDF: true,
+            targetMaxFileSizeMB: 5.0,
+            strictSizeEnforcement: true,
             generateInteractivePDF: true,
             syncKeynotePresentation: false
         )
