@@ -725,6 +725,7 @@ public struct TemplateStudioView: View {
         let options = AutonomousNotebookCompiler.CompilerOptions(
             theme: themeManager.activeTheme,
             watermarkSettings: notebookConfig.watermarkSettings,
+            chapterNavSettings: notebookConfig.chapterNavSettings,
             templateMapping: notebookConfig.templateMapping,
             totalPages: 188,
             autoCompressPDF: notebookConfig.autoCompressPDF,

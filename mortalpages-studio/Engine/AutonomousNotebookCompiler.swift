@@ -9,6 +9,7 @@ public class AutonomousNotebookCompiler {
     public struct CompilerOptions {
         public var theme: HTMLTemplateTheme
         public var watermarkSettings: WatermarkSettings
+        public var chapterNavSettings: ChapterNavIndicatorSettings
         public var templateMapping: NotebookTemplateMapping
         public var totalPages: Int // Default 188
         public var outputPath: String
@@ -18,6 +19,7 @@ public class AutonomousNotebookCompiler {
         public init(
             theme: HTMLTemplateTheme = .glassLight,
             watermarkSettings: WatermarkSettings = .defaultSettings,
+            chapterNavSettings: ChapterNavIndicatorSettings = .defaultSettings,
             templateMapping: NotebookTemplateMapping = .defaultMapping,
             totalPages: Int = 188,
             outputPath: String = "",
@@ -26,11 +28,41 @@ public class AutonomousNotebookCompiler {
         ) {
             self.theme = theme
             self.watermarkSettings = watermarkSettings
+            self.chapterNavSettings = chapterNavSettings
             self.templateMapping = templateMapping
             self.totalPages = totalPages
             self.outputPath = outputPath
             self.autoCompressPDF = autoCompressPDF
             self.targetMaxFileSizeMB = targetMaxFileSizeMB
+        }
+    }
+    
+    public struct ParsedHTMLLink {
+        public enum Kind {
+            case tab
+            case chapterCard
+            case templateCard
+        }
+        public var kind: Kind
+        public var dest: String
+        public var index: Int
+        public var rect: CGRect // In CoreGraphics PDF coordinates (bottom-left origin)
+        
+        public init(kind: Kind, dest: String, index: Int, rect: CGRect) {
+            self.kind = kind
+            self.dest = dest
+            self.index = index
+            self.rect = rect
+        }
+    }
+    
+    public struct RenderedComponent {
+        public var pdfPage: CGPDFPage
+        public var links: [ParsedHTMLLink]
+        
+        public init(pdfPage: CGPDFPage, links: [ParsedHTMLLink]) {
+            self.pdfPage = pdfPage
+            self.links = links
         }
     }
     
@@ -111,36 +143,55 @@ public class AutonomousNotebookCompiler {
             }
         }
         
-        // 4. Preload HTML Template Files
-        let loadHTMLFile: (String) -> String = { relPath in
-            let fileURL = templateDir.appendingPathComponent(relPath)
-            return (try? String(contentsOf: fileURL, encoding: .utf8)) ?? ""
-        }
+        // 4. Preload CSS Files & Build Inlined Stylesheet to avoid WebKit file:// cross-origin blocks
+        let themeCSS = (try? String(contentsOf: templateDir.appendingPathComponent("Base/theme_variables.css"), encoding: .utf8)) ?? ""
+        let stylesCSS = (try? String(contentsOf: templateDir.appendingPathComponent("Base/styles.css"), encoding: .utf8)) ?? ""
         
-        // Build CSS variable injection string
         var cssVars = ":root {\n"
         for (k, v) in options.theme.variables {
             cssVars += "  \(k): \(v) !important;\n"
         }
         cssVars += "}\n"
-        let styleOverride = "<style id='injected-theme'>\n\(cssVars)</style>\n"
         
-        let injectTheme: (String) -> String = { html in
-            if html.contains("</head>") {
-                return html.replacingOccurrences(of: "</head>", with: "\(styleOverride)</head>")
+        let inlinedStylesTag = """
+        <style id='inlined-template-studio-styles'>
+        \(themeCSS)
+        \(stylesCSS)
+        \(cssVars)
+        </style>
+        """
+        
+        let loadAndPrepareHTML: (String) -> String = { relPath in
+            let fileURL = templateDir.appendingPathComponent(relPath)
+            guard var html = try? String(contentsOf: fileURL, encoding: .utf8), !html.isEmpty else {
+                return ""
             }
-            return styleOverride + html
+            // Strip relative link tags so WebKit doesn't trigger security blocks or unstyled layout
+            html = html.replacingOccurrences(of: "<link rel=\"stylesheet\" href=\"../Base/theme_variables.css\">", with: "")
+            html = html.replacingOccurrences(of: "<link rel=\"stylesheet\" href=\"../Base/styles.css\">", with: "")
+            html = html.replacingOccurrences(of: "<link rel=\"stylesheet\" href=\"theme_variables.css\">", with: "")
+            html = html.replacingOccurrences(of: "<link rel=\"stylesheet\" href=\"styles.css\">", with: "")
+            
+            if html.contains("</head>") {
+                return html.replacingOccurrences(of: "</head>", with: "\(inlinedStylesTag)\n</head>")
+            }
+            return inlinedStylesTag + html
         }
         
-        // Thread-safe WebKit renderer
-        func renderHTMLToPDFPage(html: String) throws -> CGPDFPage? {
-            let preparedHTML = injectTheme(html)
+        // Thread-safe WebKit renderer with live DOM coordinate extraction
+        func renderHTMLComponent(html: String) throws -> RenderedComponent? {
+            guard !html.isEmpty else { return nil }
             var renderedData: Data? = nil
+            var extractedLinks: [ParsedHTMLLink] = []
             var renderError: Error? = nil
             var isFinished = false
             
             let loadBlock = {
-                let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1152, height: 1485))
+                let config = WKWebViewConfiguration()
+                config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+                config.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
+                
+                let webView = WKWebView(frame: CGRect(x: 0, y: 0, width: 1152, height: 1485), configuration: config)
                 
                 class NavDelegate: NSObject, WKNavigationDelegate {
                     var onFinish: (() -> Void)?
@@ -156,20 +207,85 @@ public class AutonomousNotebookCompiler {
                 objc_setAssociatedObject(webView, "delegate", delegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
                 
                 delegate.onFinish = {
-                    let pdfConfig = WKPDFConfiguration()
-                    pdfConfig.rect = CGRect(x: 0, y: 0, width: 1152, height: 1485)
-                    webView.createPDF(configuration: pdfConfig) { res in
-                        switch res {
-                        case .success(let data):
-                            renderedData = data
-                        case .failure(let err):
-                            renderError = err
+                    let jsExtract = """
+                    (function() {
+                        let items = [];
+                        // 1. Sidebar tabs
+                        document.querySelectorAll('.tab').forEach((el, idx) => {
+                            let r = el.getBoundingClientRect();
+                            items.push({
+                                kind: 'tab',
+                                dest: el.getAttribute('data-dest') || '',
+                                index: idx,
+                                x: r.x, y: r.y, w: r.width, h: r.height
+                            });
+                        });
+                        // 2. Chapter cards
+                        document.querySelectorAll('.chapter-card').forEach((el, idx) => {
+                            let r = el.getBoundingClientRect();
+                            items.push({
+                                kind: 'chapter_card',
+                                dest: el.getAttribute('data-dest') || '',
+                                index: idx,
+                                x: r.x, y: r.y, w: r.width, h: r.height
+                            });
+                        });
+                        // 3. Template directory cards
+                        document.querySelectorAll('.template-card, a.template-card, a[href^="#"]').forEach((el, idx) => {
+                            let r = el.getBoundingClientRect();
+                            items.push({
+                                kind: 'template_card',
+                                dest: el.getAttribute('href') || el.getAttribute('data-dest') || '',
+                                index: idx,
+                                x: r.x, y: r.y, w: r.width, h: r.height
+                            });
+                        });
+                        return items;
+                    })();
+                    """
+                    
+                    webView.evaluateJavaScript(jsExtract) { res, _ in
+                        if let items = res as? [[String: Any]] {
+                            for item in items {
+                                guard let kindStr = item["kind"] as? String,
+                                      let x = item["x"] as? CGFloat,
+                                      let y = item["y"] as? CGFloat,
+                                      let w = item["w"] as? CGFloat,
+                                      let h = item["h"] as? CGFloat,
+                                      w > 0, h > 0 else { continue }
+                                let dest = (item["dest"] as? String) ?? ""
+                                let idx = (item["index"] as? Int) ?? 0
+                                
+                                let kind: ParsedHTMLLink.Kind
+                                switch kindStr {
+                                case "tab": kind = .tab
+                                case "chapter_card": kind = .chapterCard
+                                case "template_card": kind = .templateCard
+                                default: continue
+                                }
+                                
+                                // HTML top-down Y -> PDF CoreGraphics bottom-up Y
+                                let pdfY = 1485.0 - (y + h)
+                                let rect = CGRect(x: x, y: pdfY, width: w, height: h)
+                                extractedLinks.append(ParsedHTMLLink(kind: kind, dest: dest, index: idx, rect: rect))
+                            }
                         }
-                        isFinished = true
+                        
+                        let pdfConfig = WKPDFConfiguration()
+                        pdfConfig.rect = CGRect(x: 0, y: 0, width: 1152, height: 1485)
+                        webView.createPDF(configuration: pdfConfig) { res in
+                            switch res {
+                            case .success(let data):
+                                renderedData = data
+                            case .failure(let err):
+                                renderError = err
+                            }
+                            isFinished = true
+                        }
                     }
                 }
                 webView.navigationDelegate = delegate
-                webView.loadHTMLString(preparedHTML, baseURL: templateDir.appendingPathComponent("Base"))
+                webView.loadHTMLString(html, baseURL: templateDir)
             }
             
             if Thread.isMainThread {
@@ -191,23 +307,23 @@ public class AutonomousNotebookCompiler {
                   let page = doc.page(at: 1) else {
                 return nil
             }
-            return page
+            return RenderedComponent(pdfPage: page, links: extractedLinks)
         }
         
         progress(0.15, "Rendering master template components...")
         
-        // Cache rendered master template PDF pages on demand
-        var renderedPagesCache: [String: CGPDFPage] = [:]
+        // Cache rendered master template components on demand
+        var renderedComponentsCache: [String: RenderedComponent] = [:]
         
-        let getRenderedPage: (String) -> CGPDFPage? = { relPath in
-            if let cached = renderedPagesCache[relPath] {
+        let getRenderedComponent: (String) -> RenderedComponent? = { relPath in
+            if let cached = renderedComponentsCache[relPath] {
                 return cached
             }
-            let html = loadHTMLFile(relPath)
+            let html = loadAndPrepareHTML(relPath)
             guard !html.isEmpty else { return nil }
-            if let page = try? renderHTMLToPDFPage(html: html) {
-                renderedPagesCache[relPath] = page
-                return page
+            if let comp = try? renderHTMLComponent(html: html) {
+                renderedComponentsCache[relPath] = comp
+                return comp
             }
             return nil
         }
@@ -215,18 +331,14 @@ public class AutonomousNotebookCompiler {
         var totalLinks = 0
         let totalPages = options.totalPages
         
-        // Sidebar tab geometry (Standard mortalpages 14 tabs)
-        let tabW: CGFloat = 44.0
-        let tabH: CGFloat = 98.0
-        let tabX: CGFloat = 8.0
-        let topY: CGFloat = 1420.0
-        let tabSpacing: CGFloat = 104.0
-        
         // Chapter arrow targets: Subchapter covers on Pages 45, 57, 69, ...
         let arrowTargets = [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177]
         
-        // 5. Assemble All 188 Pages
-        progress(0.30, "Assembling 188 interactive notebook pages...")
+        // Cache master sidebar tabs extracted from chapter_selection or full_grid
+        var masterTabs: [ParsedHTMLLink] = []
+        
+        // 5. Assemble All Pages
+        progress(0.30, "Assembling \(totalPages) interactive notebook pages...")
         
         for p in 1...totalPages {
             var box = mediaBox
@@ -235,66 +347,105 @@ public class AutonomousNotebookCompiler {
             
             // Resolve template for page dynamically
             let templateRelPath = options.templateMapping.resolveTemplate(forPage: p, arrowTargets: arrowTargets)
-            if let renderedPage = getRenderedPage(templateRelPath) {
-                writeContext.drawPDFPage(renderedPage)
+            if let comp = getRenderedComponent(templateRelPath) {
+                writeContext.drawPDFPage(comp.pdfPage)
+                
+                if masterTabs.isEmpty {
+                    let tabs = comp.links.filter { $0.kind == .tab }
+                    if tabs.count >= 14 {
+                        masterTabs = tabs
+                    }
+                }
+                
+                let pageTabs = comp.links.filter { $0.kind == .tab }
+                let activeTabs = pageTabs.isEmpty ? masterTabs : pageTabs
+                
+                // Inject Navigation Tabs on Pages 2..totalPages
+                if p >= 2 {
+                    for tab in activeTabs {
+                        let targetPage: Int
+                        if tab.dest == "home" {
+                            targetPage = 2
+                        } else if tab.dest == "templates" {
+                            targetPage = 15
+                        } else if tab.dest.hasPrefix("ch") {
+                            let chNum = Int(tab.dest.dropFirst(2)) ?? 1
+                            targetPage = chNum + 2 // Pages 3..14
+                        } else {
+                            targetPage = 2
+                        }
+                        
+                        if targetPage <= totalPages {
+                            writeContext.setDestination("page_\(targetPage)" as CFString, for: tab.rect)
+                            totalLinks += 1
+                        }
+                    }
+                }
+                
+                // Page 2: Chapter Selection Cards (Jump to Subchapter Sections 45, 57, 69...)
+                if p == 2 {
+                    let cards = comp.links.filter { $0.kind == .chapterCard }
+                    for card in cards {
+                        let chNum = Int(card.dest.dropFirst(2)) ?? (card.index + 1)
+                        if chNum >= 1 && chNum <= arrowTargets.count {
+                            let target = arrowTargets[chNum - 1]
+                            if target <= totalPages {
+                                writeContext.setDestination("page_\(target)" as CFString, for: card.rect)
+                                totalLinks += 1
+                                
+                                // Render visual arrow indicator if configured
+                                if options.chapterNavSettings.isEnabled && options.chapterNavSettings.renderVisualIndicator {
+                                    let arrowW = options.chapterNavSettings.width
+                                    let arrowH = options.chapterNavSettings.height
+                                    let arrowX = card.rect.maxX - arrowW - 12.0
+                                    let arrowY = card.rect.midY - arrowH / 2.0
+                                    let arrowRect = CGRect(x: arrowX, y: arrowY, width: arrowW, height: arrowH)
+                                    PDFLinkEngine.drawChapterIndicator(on: writeContext, in: arrowRect, settings: options.chapterNavSettings)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // Pages 3..14: Subchapter Selection Cards (Chapter Divider Pages)
+                if p >= 3 && p <= 14 {
+                    let currentCh = p - 2 // 1..12
+                    let chBasePage = arrowTargets[currentCh - 1]
+                    let cards = comp.links.filter { $0.kind == .chapterCard }
+                    for (idx, card) in cards.enumerated() {
+                        let target = chBasePage + idx // 12 subchapters within chapter
+                        if target <= totalPages {
+                            writeContext.setDestination("page_\(target)" as CFString, for: card.rect)
+                            totalLinks += 1
+                            
+                            if options.chapterNavSettings.isEnabled && options.chapterNavSettings.renderVisualIndicator {
+                                let arrowW = options.chapterNavSettings.width
+                                let arrowH = options.chapterNavSettings.height
+                                let arrowX = card.rect.maxX - arrowW - 12.0
+                                let arrowY = card.rect.midY - arrowH / 2.0
+                                let arrowRect = CGRect(x: arrowX, y: arrowY, width: arrowW, height: arrowH)
+                                PDFLinkEngine.drawChapterIndicator(on: writeContext, in: arrowRect, settings: options.chapterNavSettings)
+                            }
+                        }
+                    }
+                }
+                
+                // Page 15: Template Directory Cards (Jump to Pages 16..44)
+                if p == 15 {
+                    let tCards = comp.links.filter { $0.kind == .templateCard }
+                    for (idx, card) in tCards.enumerated() {
+                        let target = 16 + idx
+                        if target <= totalPages {
+                            writeContext.setDestination("page_\(target)" as CFString, for: card.rect)
+                            totalLinks += 1
+                        }
+                    }
+                }
             }
             
             // Watermark stamping
             if shouldStampPage(p) {
                 drawWatermarkOnContext(writeContext)
-            }
-            
-            // Inject Navigation Tabs on Pages 2..188
-            if p >= 2 {
-                // 1. Home Tab -> Page 2
-                let homeRect = CGRect(x: tabX, y: topY, width: tabW, height: tabH)
-                writeContext.setDestination("page_2" as CFString, for: homeRect)
-                totalLinks += 1
-                
-                // 2. Template List Tab -> Page 15
-                let tlistRect = CGRect(x: tabX, y: topY - tabSpacing, width: tabW, height: tabH)
-                writeContext.setDestination("page_15" as CFString, for: tlistRect)
-                totalLinks += 1
-                
-                // 3. Chapters 1..12 Tabs -> Pages 3..14
-                for ch in 1...12 {
-                    let chY = topY - tabSpacing * CGFloat(ch + 1)
-                    let chRect = CGRect(x: tabX, y: chY, width: tabW, height: tabH)
-                    let targetPage = ch + 2 // Pages 3..14
-                    writeContext.setDestination("page_\(targetPage)" as CFString, for: chRect)
-                    totalLinks += 1
-                }
-            }
-            
-            // Inject Chapter Selection Cards on Page 2 (2-Column Grid)
-            if p == 2 {
-                let rows: [CGFloat] = [381.875, 477.875, 573.875, 669.875, 765.875, 861.875]
-                let cardH: CGFloat = 72.0
-                let cardW: CGFloat = 543.0
-                let col1X: CGFloat = 8.0
-                let col2X: CGFloat = 601.0
-                
-                for (rowIdx, htmlY) in rows.enumerated() {
-                    let pdfY = 1485.0 - htmlY - cardH
-                    
-                    // Col 1 (Odd chapters: 1, 3, 5, 7, 9, 11)
-                    let chOdd = rowIdx * 2 + 1
-                    if chOdd <= arrowTargets.count {
-                        let targetOdd = arrowTargets[chOdd - 1]
-                        let rectOdd = CGRect(x: col1X, y: pdfY, width: cardW, height: cardH)
-                        writeContext.setDestination("page_\(targetOdd)" as CFString, for: rectOdd)
-                        totalLinks += 1
-                    }
-                    
-                    // Col 2 (Even chapters: 2, 4, 6, 8, 10, 12)
-                    let chEven = rowIdx * 2 + 2
-                    if chEven <= arrowTargets.count {
-                        let targetEven = arrowTargets[chEven - 1]
-                        let rectEven = CGRect(x: col2X, y: pdfY, width: cardW, height: cardH)
-                        writeContext.setDestination("page_\(targetEven)" as CFString, for: rectEven)
-                        totalLinks += 1
-                    }
-                }
             }
             
             writeContext.endPage()

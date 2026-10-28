@@ -347,7 +347,7 @@ public class PDFLinkEngine {
         }
     }
     
-    private static func drawChapterIndicator(on ctx: CGContext, in rect: CGRect, settings: ChapterNavIndicatorSettings) {
+    public static func drawChapterIndicator(on ctx: CGContext, in rect: CGRect, settings: ChapterNavIndicatorSettings) {
         ctx.saveGState()
         
         let corner = min(rect.width, rect.height) / 2.0

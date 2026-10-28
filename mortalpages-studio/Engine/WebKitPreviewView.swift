@@ -17,6 +17,8 @@ public struct WebKitPreviewView: NSViewRepresentable {
     
     public func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
+        config.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
+        config.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.setValue(false, forKey: "drawsBackground") // Transparent background
         webView.pageZoom = zoomFactor
@@ -54,6 +56,38 @@ public struct WebKitPreviewView: NSViewRepresentable {
     
     private func loadContent(in webView: WKWebView) {
         var finalHTML = htmlContent
+        
+        // Auto-inline base stylesheets if present to avoid WebKit sandbox / cross-directory blocks
+        var baseCSS = ""
+        if let base = baseURL {
+            let candidates = [
+                base.appendingPathComponent("../Base"),
+                base.appendingPathComponent("Base"),
+                base
+            ]
+            for candidate in candidates {
+                let tURL = candidate.appendingPathComponent("theme_variables.css")
+                let sURL = candidate.appendingPathComponent("styles.css")
+                if FileManager.default.fileExists(atPath: tURL.path) && FileManager.default.fileExists(atPath: sURL.path) {
+                    let tc = (try? String(contentsOf: tURL, encoding: .utf8)) ?? ""
+                    let sc = (try? String(contentsOf: sURL, encoding: .utf8)) ?? ""
+                    baseCSS = "\(tc)\n\(sc)\n"
+                    break
+                }
+            }
+        }
+        if !baseCSS.isEmpty {
+            finalHTML = finalHTML.replacingOccurrences(of: "<link rel=\"stylesheet\" href=\"../Base/theme_variables.css\">", with: "")
+            finalHTML = finalHTML.replacingOccurrences(of: "<link rel=\"stylesheet\" href=\"../Base/styles.css\">", with: "")
+            finalHTML = finalHTML.replacingOccurrences(of: "<link rel=\"stylesheet\" href=\"theme_variables.css\">", with: "")
+            finalHTML = finalHTML.replacingOccurrences(of: "<link rel=\"stylesheet\" href=\"styles.css\">", with: "")
+            let inlinedTag = "<style id='inlined-preview-base-css'>\n\(baseCSS)</style>"
+            if finalHTML.contains("</head>") {
+                finalHTML = finalHTML.replacingOccurrences(of: "</head>", with: "\(inlinedTag)\n</head>")
+            } else {
+                finalHTML = inlinedTag + finalHTML
+            }
+        }
         
         // Inject custom CSS variable overrides inside <head>
         if !customVariables.isEmpty {
