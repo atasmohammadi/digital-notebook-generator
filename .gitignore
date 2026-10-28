@@ -1,0 +1,15 @@
+# Compiled App Bundles & Binaries
+*.app
+keynote_bg_swapper
+pdf_hyperlink_engine
+build/
+
+# macOS Metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+
+# User Generated Attachments & Logs
+**/Attachments/*
+*.log

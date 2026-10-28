@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Habit Tracker</title>
+  <link rel="stylesheet" href="../Base/theme_variables.css">
+  <link rel="stylesheet" href="../Base/styles.css">
+  <style>
+    .tracker-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .tracker-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .tracker-table th, .tracker-table td {
+      border: 1px solid var(--border-subtle);
+      text-align: center;
+      padding: 6px 2px;
+    }
+    .tracker-table th {
+      background: rgba(0, 0, 0, 0.02);
+      font-weight: 700;
+      color: var(--text-secondary);
+    }
+    .month-col {
+      width: 60px;
+      font-family: var(--font-heading);
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: left !important;
+      padding-left: 8px !important;
+    }
+    .habit-cell {
+      height: 28px;
+    }
+    .tracker-progress-section {
+      height: 120px;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+    }
+    .section-title {
+      font-family: var(--font-heading);
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+    .progress-bars {
+      flex: 1;
+      background-size: 100% 24px;
+      background-image: linear-gradient(to bottom, transparent 23px, var(--line-color) 1px);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <aside class="sidebar">
+      <div class="tab" data-dest="home"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>
+      <div class="tab active" data-dest="templates"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div>
+      <div class="tab" data-dest="ch1">1</div><div class="tab" data-dest="ch2">2</div><div class="tab" data-dest="ch3">3</div>
+      <div class="tab" data-dest="ch4">4</div><div class="tab" data-dest="ch5">5</div><div class="tab" data-dest="ch6">6</div>
+      <div class="tab" data-dest="ch7">7</div><div class="tab" data-dest="ch8">8</div><div class="tab" data-dest="ch9">9</div>
+      <div class="tab" data-dest="ch10">10</div><div class="tab" data-dest="ch11">11</div><div class="tab" data-dest="ch12">12</div>
+    </aside>
+
+    <main class="content-area">
+      <header class="page-header">
+        <h1 class="page-title">Yearly Habit Tracker</h1>
+        <p class="page-subtitle">365 Days Progress Matrix</p>
+      </header>
+
+      <div class="page-body">
+        <div class="tracker-container">
+          <table class="tracker-table">
+            <thead>
+              <tr>
+                <th class="month-col">Month</th>
+                <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+                <th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th>
+                <th>21</th><th>22</th><th>23</th><th>24</th><th>25</th><th>26</th><th>27</th><th>28</th><th>29</th><th>30</th><th>31</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td class="month-col">Jan</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Feb</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Mar</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Apr</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">May</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Jun</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Jul</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Aug</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Sep</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Oct</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Nov</td><td class="habit-cell" colspan="31"></td></tr>
+              <tr><td class="month-col">Dec</td><td class="habit-cell" colspan="31"></td></tr>
+            </tbody>
+          </table>
+
+          <div class="tracker-progress-section">
+            <span class="section-title">Habit Milestones & Goal Reflection</span>
+            <div class="progress-bars"></div>
+          </div>
+        </div>
+      </div>
+
+      <footer class="page-footer">
+        <div class="watermark-plaque">mortalpages.com</div>
+      </footer>
+    </main>
+  </div>
+</body>
+</html>

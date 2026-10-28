@@ -1,0 +1,230 @@
+import Foundation
+import CoreGraphics
+
+public struct NotebookConfig: Codable, Equatable {
+    public var themeName: String
+    public var targetPDFPath: String
+    public var templatePDFPath: String
+    public var outputPath: String
+    
+    // Page Structure
+    public var hasCover: Bool
+    public var coverPageIndex: Int // 1-based (default 1)
+    public var hasMasterLayout: Bool
+    public var masterLayoutPageIndex: Int // 1-based (default 2)
+    public var excludeMasterLayoutFromOutput: Bool
+    
+    // Sidebar Rules
+    public var sidebarWidth: CGFloat
+    public var skipSidebarStartPage: Int // 1-based in final PDF (default 3)
+    public var skipSidebarEndPage: Int   // 1-based in final PDF (default 14)
+    
+    // Chapter Selection Arrows on Page 2
+    public var hasChapterArrows: Bool
+    public var arrowTargets: [Int] // Chapters 1..12 targets: 45, 57, 69, ...
+    public var useSidebarSizeForArrows: Bool
+    public var customArrowWidth: CGFloat
+    public var customArrowHeight: CGFloat
+    
+    // Rich Watermark Settings
+    public var watermarkSettings: WatermarkSettings
+    
+    // Page & Section Template Mapping
+    public var templateMapping: NotebookTemplateMapping
+    
+    // Legacy convenience properties
+    public var stampWatermarkOnAllPages: Bool {
+        get { watermarkSettings.mode != .none }
+        set { watermarkSettings.mode = newValue ? .extractedFromLayout : .none }
+    }
+    public var watermarkX: CGFloat {
+        get { watermarkSettings.layoutCropX }
+        set { watermarkSettings.layoutCropX = newValue }
+    }
+    public var watermarkY: CGFloat {
+        get { watermarkSettings.layoutCropY }
+        set { watermarkSettings.layoutCropY = newValue }
+    }
+    public var watermarkWidth: CGFloat {
+        get { watermarkSettings.layoutCropW }
+        set { watermarkSettings.layoutCropW = newValue }
+    }
+    public var watermarkHeight: CGFloat {
+        get { watermarkSettings.layoutCropH }
+        set { watermarkSettings.layoutCropH = newValue }
+    }
+    public var neutralizeDataDetectors: Bool {
+        get { watermarkSettings.neutralizeDataDetectors }
+        set { watermarkSettings.neutralizeDataDetectors = newValue }
+    }
+    
+    // Actions
+    public var generateInteractivePDF: Bool
+    public var syncKeynotePresentation: Bool
+    
+    public init(
+        themeName: String,
+        targetPDFPath: String,
+        templatePDFPath: String,
+        outputPath: String,
+        hasCover: Bool,
+        coverPageIndex: Int,
+        hasMasterLayout: Bool,
+        masterLayoutPageIndex: Int,
+        excludeMasterLayoutFromOutput: Bool,
+        sidebarWidth: CGFloat,
+        skipSidebarStartPage: Int,
+        skipSidebarEndPage: Int,
+        hasChapterArrows: Bool,
+        arrowTargets: [Int],
+        useSidebarSizeForArrows: Bool,
+        customArrowWidth: CGFloat,
+        customArrowHeight: CGFloat,
+        watermarkSettings: WatermarkSettings = .defaultSettings,
+        templateMapping: NotebookTemplateMapping = .defaultMapping,
+        generateInteractivePDF: Bool,
+        syncKeynotePresentation: Bool
+    ) {
+        self.themeName = themeName
+        self.targetPDFPath = targetPDFPath
+        self.templatePDFPath = templatePDFPath
+        self.outputPath = outputPath
+        self.hasCover = hasCover
+        self.coverPageIndex = coverPageIndex
+        self.hasMasterLayout = hasMasterLayout
+        self.masterLayoutPageIndex = masterLayoutPageIndex
+        self.excludeMasterLayoutFromOutput = excludeMasterLayoutFromOutput
+        self.sidebarWidth = sidebarWidth
+        self.skipSidebarStartPage = skipSidebarStartPage
+        self.skipSidebarEndPage = skipSidebarEndPage
+        self.hasChapterArrows = hasChapterArrows
+        self.arrowTargets = arrowTargets
+        self.useSidebarSizeForArrows = useSidebarSizeForArrows
+        self.customArrowWidth = customArrowWidth
+        self.customArrowHeight = customArrowHeight
+        self.watermarkSettings = watermarkSettings
+        self.templateMapping = templateMapping
+        self.generateInteractivePDF = generateInteractivePDF
+        self.syncKeynotePresentation = syncKeynotePresentation
+    }
+    
+    // Codable implementation with backward-compatibility for legacy presets
+    enum CodingKeys: String, CodingKey {
+        case themeName, targetPDFPath, templatePDFPath, outputPath
+        case hasCover, coverPageIndex, hasMasterLayout, masterLayoutPageIndex, excludeMasterLayoutFromOutput
+        case sidebarWidth, skipSidebarStartPage, skipSidebarEndPage
+        case hasChapterArrows, arrowTargets, useSidebarSizeForArrows, customArrowWidth, customArrowHeight
+        case watermarkSettings, templateMapping
+        case stampWatermarkOnAllPages, watermarkX, watermarkY, watermarkWidth, watermarkHeight, neutralizeDataDetectors
+        case generateInteractivePDF, syncKeynotePresentation
+    }
+    
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        themeName = try container.decode(String.self, forKey: .themeName)
+        targetPDFPath = try container.decode(String.self, forKey: .targetPDFPath)
+        templatePDFPath = try container.decode(String.self, forKey: .templatePDFPath)
+        outputPath = try container.decode(String.self, forKey: .outputPath)
+        hasCover = try container.decode(Bool.self, forKey: .hasCover)
+        coverPageIndex = try container.decode(Int.self, forKey: .coverPageIndex)
+        hasMasterLayout = try container.decode(Bool.self, forKey: .hasMasterLayout)
+        masterLayoutPageIndex = try container.decode(Int.self, forKey: .masterLayoutPageIndex)
+        excludeMasterLayoutFromOutput = try container.decode(Bool.self, forKey: .excludeMasterLayoutFromOutput)
+        sidebarWidth = try container.decode(CGFloat.self, forKey: .sidebarWidth)
+        skipSidebarStartPage = try container.decode(Int.self, forKey: .skipSidebarStartPage)
+        skipSidebarEndPage = try container.decode(Int.self, forKey: .skipSidebarEndPage)
+        hasChapterArrows = try container.decode(Bool.self, forKey: .hasChapterArrows)
+        arrowTargets = try container.decode([Int].self, forKey: .arrowTargets)
+        useSidebarSizeForArrows = try container.decode(Bool.self, forKey: .useSidebarSizeForArrows)
+        customArrowWidth = try container.decode(CGFloat.self, forKey: .customArrowWidth)
+        customArrowHeight = try container.decode(CGFloat.self, forKey: .customArrowHeight)
+        generateInteractivePDF = try container.decode(Bool.self, forKey: .generateInteractivePDF)
+        syncKeynotePresentation = try container.decode(Bool.self, forKey: .syncKeynotePresentation)
+        
+        self.templateMapping = (try? container.decode(NotebookTemplateMapping.self, forKey: .templateMapping)) ?? .defaultMapping
+        
+        if let ws = try? container.decode(WatermarkSettings.self, forKey: .watermarkSettings) {
+            self.watermarkSettings = ws
+        } else {
+            // Reconstruct from legacy fields
+            let legacyStamp = (try? container.decode(Bool.self, forKey: .stampWatermarkOnAllPages)) ?? true
+            let legacyX = (try? container.decode(CGFloat.self, forKey: .watermarkX)) ?? 501.0
+            let legacyY = (try? container.decode(CGFloat.self, forKey: .watermarkY)) ?? 28.0
+            let legacyW = (try? container.decode(CGFloat.self, forKey: .watermarkWidth)) ?? 150.0
+            let legacyH = (try? container.decode(CGFloat.self, forKey: .watermarkHeight)) ?? 35.0
+            let legacyNeut = (try? container.decode(Bool.self, forKey: .neutralizeDataDetectors)) ?? true
+            
+            var ws = WatermarkSettings.defaultSettings
+            ws.mode = legacyStamp ? .extractedFromLayout : .none
+            ws.layoutCropX = legacyX
+            ws.layoutCropY = legacyY
+            ws.layoutCropW = legacyW
+            ws.layoutCropH = legacyH
+            ws.neutralizeDataDetectors = legacyNeut
+            self.watermarkSettings = ws
+        }
+    }
+    
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(themeName, forKey: .themeName)
+        try container.encode(targetPDFPath, forKey: .targetPDFPath)
+        try container.encode(templatePDFPath, forKey: .templatePDFPath)
+        try container.encode(outputPath, forKey: .outputPath)
+        try container.encode(hasCover, forKey: .hasCover)
+        try container.encode(coverPageIndex, forKey: .coverPageIndex)
+        try container.encode(hasMasterLayout, forKey: .hasMasterLayout)
+        try container.encode(masterLayoutPageIndex, forKey: .masterLayoutPageIndex)
+        try container.encode(excludeMasterLayoutFromOutput, forKey: .excludeMasterLayoutFromOutput)
+        try container.encode(sidebarWidth, forKey: .sidebarWidth)
+        try container.encode(skipSidebarStartPage, forKey: .skipSidebarStartPage)
+        try container.encode(skipSidebarEndPage, forKey: .skipSidebarEndPage)
+        try container.encode(hasChapterArrows, forKey: .hasChapterArrows)
+        try container.encode(arrowTargets, forKey: .arrowTargets)
+        try container.encode(useSidebarSizeForArrows, forKey: .useSidebarSizeForArrows)
+        try container.encode(customArrowWidth, forKey: .customArrowWidth)
+        try container.encode(customArrowHeight, forKey: .customArrowHeight)
+        try container.encode(generateInteractivePDF, forKey: .generateInteractivePDF)
+        try container.encode(syncKeynotePresentation, forKey: .syncKeynotePresentation)
+        
+        try container.encode(watermarkSettings, forKey: .watermarkSettings)
+        try container.encode(templateMapping, forKey: .templateMapping)
+        // Also encode legacy fields for backwards compatibility
+        try container.encode(stampWatermarkOnAllPages, forKey: .stampWatermarkOnAllPages)
+        try container.encode(watermarkX, forKey: .watermarkX)
+        try container.encode(watermarkY, forKey: .watermarkY)
+        try container.encode(watermarkWidth, forKey: .watermarkWidth)
+        try container.encode(watermarkHeight, forKey: .watermarkHeight)
+        try container.encode(neutralizeDataDetectors, forKey: .neutralizeDataDetectors)
+    }
+    
+    public static var defaultLight: NotebookConfig {
+        return standardMortalpages
+    }
+    
+    public static var standardMortalpages: NotebookConfig {
+        return NotebookConfig(
+            themeName: "Glass Notebook (Light)",
+            targetPDFPath: "",
+            templatePDFPath: "/Users/sarahbenita/Library/Mobile Documents/com~apple~CloudDocs/digital business related/mortalpages/Notebook 4 - pretty pastel/Pretty Pastel Portrait.pdf",
+            outputPath: "",
+            hasCover: true,
+            coverPageIndex: 1,
+            hasMasterLayout: true,
+            masterLayoutPageIndex: 2,
+            excludeMasterLayoutFromOutput: true,
+            sidebarWidth: 60.0,
+            skipSidebarStartPage: 3,
+            skipSidebarEndPage: 14,
+            hasChapterArrows: true,
+            arrowTargets: [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177],
+            useSidebarSizeForArrows: true,
+            customArrowWidth: 42.22,
+            customArrowHeight: 101.51,
+            watermarkSettings: .defaultSettings,
+            templateMapping: .defaultMapping,
+            generateInteractivePDF: true,
+            syncKeynotePresentation: false
+        )
+    }
+}

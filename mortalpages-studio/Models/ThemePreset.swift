@@ -1,0 +1,76 @@
+import Foundation
+
+public struct ThemePreset: Identifiable, Codable, Equatable {
+    public var id: UUID
+    public var name: String
+    public var description: String
+    public var config: NotebookConfig
+    
+    public init(id: UUID = UUID(), name: String, description: String, config: NotebookConfig) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.config = config
+    }
+}
+
+public class PresetManager: ObservableObject {
+    @Published public var presets: [ThemePreset] = []
+    
+    private let fileURL: URL
+    
+    public init() {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let dir = appSupport.appendingPathComponent("mortalpages Studio")
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        self.fileURL = dir.appendingPathComponent("presets.json")
+        loadPresets()
+    }
+    
+    public func loadPresets() {
+        if let data = try? Data(contentsOf: fileURL),
+           let decoded = try? JSONDecoder().decode([ThemePreset].self, from: data), !decoded.isEmpty {
+            self.presets = decoded
+        } else {
+            // Default initial presets
+            var lightConfig = NotebookConfig.standardMortalpages
+            lightConfig.themeName = "Glass Notebook (Light)"
+            
+            var darkConfig = NotebookConfig.standardMortalpages
+            darkConfig.themeName = "Glass Notebook (Dark)"
+            
+            var beigeConfig = NotebookConfig.standardMortalpages
+            beigeConfig.themeName = "Glass Notebook (Beige)"
+            
+            var pastelConfig = NotebookConfig.standardMortalpages
+            pastelConfig.themeName = "Pretty Pastel"
+            
+            self.presets = [
+                ThemePreset(name: "Glass Notebook (Light)", description: "Glass style with light transparent tabs", config: lightConfig),
+                ThemePreset(name: "Glass Notebook (Dark)", description: "Glass style with dark mode tabs", config: darkConfig),
+                ThemePreset(name: "Glass Notebook (Beige)", description: "Minimalist warm beige palette", config: beigeConfig),
+                ThemePreset(name: "Pretty Pastel", description: "Pastel color palette master", config: pastelConfig)
+            ]
+            savePresets()
+        }
+    }
+    
+    public func savePresets() {
+        if let encoded = try? JSONEncoder().encode(presets) {
+            try? encoded.write(to: fileURL)
+        }
+    }
+    
+    public func addPreset(name: String, description: String, config: NotebookConfig) {
+        var c = config
+        c.themeName = name
+        let preset = ThemePreset(name: name, description: description, config: c)
+        presets.append(preset)
+        savePresets()
+    }
+    
+    public func deletePreset(at offsets: IndexSet) {
+        presets.remove(atOffsets: offsets)
+        savePresets()
+    }
+}

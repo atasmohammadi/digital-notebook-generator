@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Daily Focus & Habit Matrix</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:wght@300;400;500;600&display=swap');
+
+    :root {
+      --canvas-w: 1152px;
+      --canvas-h: 1485px;
+      --spine-w: 60px;
+      
+      /* Color Palette: Editorial Warm Stone & Minimal Linen */
+      --bg-canvas: #FAF8F5;
+      --bg-surface: #FFFFFF;
+      --bg-spine: #F1ECE6;
+      --bg-tab-hover: #E7E0D6;
+      --text-main: #232220;
+      --text-muted: #7E7972;
+      --text-light: #A5A099;
+      --border-subtle: #E8E3DC;
+      --border-strong: #D5CEC4;
+      --accent: #4B453E;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background: #E5E1DC;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Plus Jakarta Sans', -apple-system, sans-serif;
+      color: var(--text-main);
+      padding: 20px;
+    }
+
+    /* 1. Canvas Geometry: 1152px x 1485px */
+    .planner-canvas {
+      width: var(--canvas-w);
+      height: var(--canvas-h);
+      background-color: var(--bg-canvas);
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.12), 0 2px 10px rgba(0, 0, 0, 0.05);
+      border-radius: 2px;
+      display: flex;
+    }
+
+    /* 2. Navigation Spine: 60px sidebar with 14 tabs */
+    .nav-spine {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: var(--spine-w);
+      height: var(--canvas-h);
+      background-color: var(--bg-spine);
+      border-right: 1px solid var(--border-strong);
+      display: flex;
+      flex-direction: column;
+      z-index: 10;
+    }
+
+    .spine-tab {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(213, 206, 196, 0.45);
+      transition: all 0.2s ease;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .spine-tab:last-child {
+      border-bottom: none;
+    }
+
+    .spine-tab .tab-label {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      white-space: nowrap;
+    }
+
+    .spine-tab.active {
+      background-color: var(--bg-canvas);
+      color: var(--text-main);
+      font-weight: 600;
+      width: calc(var(--spine-w) + 1px);
+    }
+
+    .spine-tab.active::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background-color: var(--accent);
+    }
+
+    /* 3. Content Area: margin-left: 60px, width: calc(1152px - 60px), padding: 60px 60px 70px 30px */
+    .content-area {
+      margin-left: var(--spine-w);
+      width: calc(var(--canvas-w) - var(--spine-w));
+      height: 100%;
+      padding: 60px 60px 70px 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    /* Header Section */
+    .header-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      border-bottom: 1.5px solid var(--text-main);
+      padding-bottom: 16px;
+      margin-bottom: 24px;
+    }
+
+    .brand-eyebrow {
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      font-weight: 600;
+    }
+
+    .page-title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 34px;
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      line-height: 1;
+      color: var(--text-main);
+    }
+
+    .header-meta {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    .meta-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .meta-label {
+      font-size: 9px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      font-weight: 600;
+    }
+
+    .meta-line {
+      width: 140px;
+      border-bottom: 1px solid var(--border-strong);
+      height: 20px;
+    }
+
+    .day-selector {
+      display: flex;
+      gap: 6px;
+      align-self: flex-end;
+      margin-bottom: 2px;
+    }
+
+    .day-pill {
+      font-size: 10px;
+      font-weight: 500;
+      color: var(--text-muted);
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid var(--border-subtle);
+      border-radius: 50%;
+    }
+
+    /* Top Section: 3 Daily Priorities */
+    .priorities-section {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px 24px 20px 24px;
+      margin-bottom: 24px;
+    }
+
+    .section-eyebrow {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .section-eyebrow::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border-subtle);
+    }
+
+    .priorities-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .priority-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+    }
+
+    .priority-num {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-size: 20px;
+      font-style: italic;
+      color: var(--text-muted);
+      line-height: 1;
+      margin-top: 2px;
+    }
+
+    .priority-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-top: 2px;
+    }
+
+    .priority-line {
+      border-bottom: 1px dashed var(--border-strong);
+      height: 16px;
+      width: 100%;
+    }
+
+    .priority-circle {
+      width: 18px;
+      height: 18px;
+      border: 1.5px solid var(--border-strong);
+      border-radius: 50%;
+      margin-top: 2px;
+      flex-shrink: 0;
+    }
+
+    /* 2-Column Middle Section */
+    .middle-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      flex: 1;
+      min-height: 0;
+      margin-bottom: 24px;
+    }
+
+    .column-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Time Blocks Schedule */
+    .time-blocks-list {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+      padding-top: 6px;
+    }
+
+    .time-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      height: 38px;
+      border-bottom: 1px solid rgba(232, 227, 220, 0.6);
+    }
+
+    .time-label {
+      width: 52px;
+      font-size: 10.5px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .time-slot-line {
+      flex: 1;
+      height: 100%;
+      display: flex;
+      align-items: center;
+    }
+
+    .time-subtick {
+      width: 100%;
+      height: 100%;
+      border-left: 1px solid var(--border-subtle);
+      margin-left: 6px;
+      opacity: 0.4;
+    }
+
+    /* Notes & Reflections Space */
+    .notes-container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      padding-top: 6px;
+    }
+
+    .notes-lines {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+    }
+
+    .note-line {
+      width: 100%;
+      height: 38px;
+      border-bottom: 1px solid rgba(232, 227, 220, 0.7);
+    }
+
+    .notes-footer-prompt {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px dashed var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      font-size: 9.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--text-light);
+    }
+
+    /* Bottom Row: 5 Habit Check Circles */
+    .habit-section {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 18px 24px;
+    }
+
+    .habit-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .habit-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 10px;
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      gap: 10px;
+    }
+
+    .habit-check-circle {
+      width: 32px;
+      height: 32px;
+      border: 1.5px solid var(--border-strong);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--bg-surface);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .habit-check-circle svg {
+      width: 14px;
+      height: 14px;
+      stroke: var(--text-light);
+      stroke-width: 2;
+      opacity: 0.3;
+    }
+
+    .habit-title-line {
+      width: 85%;
+      border-bottom: 1px solid var(--border-strong);
+      height: 16px;
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.04em;
+    }
+
+    .habit-index {
+      font-size: 8.5px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-light);
+      font-weight: 600;
+    }
+
+    /* Subtle Studio Footer */
+    .planner-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 14px;
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-light);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="planner-canvas">
+
+    <!-- Left Navigation Spine: 14 tabs -->
+    <nav class="nav-spine">
+      <div class="spine-tab active"><span class="tab-label">01 TODAY</span></div>
+      <div class="spine-tab"><span class="tab-label">02 JAN</span></div>
+      <div class="spine-tab"><span class="tab-label">03 FEB</span></div>
+      <div class="spine-tab"><span class="tab-label">04 MAR</span></div>
+      <div class="spine-tab"><span class="tab-label">05 APR</span></div>
+      <div class="spine-tab"><span class="tab-label">06 MAY</span></div>
+      <div class="spine-tab"><span class="tab-label">07 JUN</span></div>
+      <div class="spine-tab"><span class="tab-label">08 JUL</span></div>
+      <div class="spine-tab"><span class="tab-label">09 AUG</span></div>
+      <div class="spine-tab"><span class="tab-label">10 SEP</span></div>
+      <div class="spine-tab"><span class="tab-label">11 OCT</span></div>
+      <div class="spine-tab"><span class="tab-label">12 NOV</span></div>
+      <div class="spine-tab"><span class="tab-label">13 DEC</span></div>
+      <div class="spine-tab"><span class="tab-label">14 NOTES</span></div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main class="content-area">
+
+      <!-- Header: Title & Meta -->
+      <header class="header-section">
+        <div>
+          <div class="brand-eyebrow">mortalpages Studio &bull; Editorial Series</div>
+          <h1 class="page-title">Daily Focus &amp; Habit Matrix</h1>
+        </div>
+
+        <div class="header-meta">
+          <div class="meta-field">
+            <span class="meta-label">Date</span>
+            <div class="meta-line"></div>
+          </div>
+          <div class="meta-field">
+            <span class="meta-label">Day of Week</span>
+            <div class="day-selector">
+              <span class="day-pill">M</span>
+              <span class="day-pill">T</span>
+              <span class="day-pill">W</span>
+              <span class="day-pill">T</span>
+              <span class="day-pill">F</span>
+              <span class="day-pill">S</span>
+              <span class="day-pill">S</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Top Section: 3 Daily Priorities -->
+      <section class="priorities-section">
+        <div class="section-eyebrow">Key Daily Priorities &mdash; Essential Focus</div>
+        <div class="priorities-grid">
+          
+          <!-- Priority 1 -->
+          <div class="priority-item">
+            <span class="priority-num">I</span>
+            <div class="priority-content">
+              <div class="priority-line"></div>
+              <div class="priority-line"></div>
+            </div>
+            <div class="priority-circle"></div>
+          </div>
+
+          <!-- Priority 2 -->
+          <div class="priority-item">
+            <span class="priority-num">II</span>
+            <div class="priority-content">
+              <div class="priority-line"></div>
+              <div class="priority-line"></div>
+            </div>
+            <div class="priority-circle"></div>
+          </div>
+
+          <!-- Priority 3 -->
+          <div class="priority-item">
+            <span class="priority-num">III</span>
+            <div class="priority-content">
+              <div class="priority-line"></div>
+              <div class="priority-line"></div>
+            </div>
+            <div class="priority-circle"></div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- 2-Column Middle Section: Time Blocks & Notes -->
+      <section class="middle-section">
+        
+        <!-- Left Column: Time Blocks -->
+        <div class="column-card">
+          <div class="section-eyebrow">Hourly Allocation &bull; 06:00 &ndash; 21:00</div>
+          <div class="time-blocks-list">
+            <div class="time-row"><span class="time-label">06:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">07:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">08:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">09:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">10:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">11:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">12:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">13:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">14:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">15:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">16:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">17:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">18:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">19:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">20:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+            <div class="time-row"><span class="time-label">21:00</span><div class="time-slot-line"><div class="time-subtick"></div></div></div>
+          </div>
+        </div>
+
+        <!-- Right Column: Notes, Thoughts & Reflections -->
+        <div class="column-card">
+          <div class="section-eyebrow">Notes, Brain Dump &amp; Insights</div>
+          <div class="notes-container">
+            <div class="notes-lines">
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+              <div class="note-line"></div>
+            </div>
+            <div class="notes-footer-prompt">
+              <span>Evening Review &amp; Win</span>
+              <span>Intention Preserved</span>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- Bottom Row: 5 Habit Check Circles -->
+      <section class="habit-section">
+        <div class="section-eyebrow">Daily Habit Matrix &bull; Consistency Tracker</div>
+        <div class="habit-grid">
+          
+          <div class="habit-item">
+            <span class="habit-index">Habit 01</span>
+            <div class="habit-check-circle">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+            </div>
+            <div class="habit-title-line">Movement</div>
+          </div>
+
+          <div class="habit-item">
+            <span class="habit-index">Habit 02</span>
+            <div class="habit-check-circle">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+            </div>
+            <div class="habit-title-line">Hydration</div>
+          </div>
+
+          <div class="habit-item">
+            <span class="habit-index">Habit 03</span>
+            <div class="habit-check-circle">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+            </div>
+            <div class="habit-title-line">Deep Work</div>
+          </div>
+
+          <div class="habit-item">
+            <span class="habit-index">Habit 04</span>
+            <div class="habit-check-circle">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+            </div>
+            <div class="habit-title-line">Reading</div>
+          </div>
+
+          <div class="habit-item">
+            <span class="habit-index">Habit 05</span>
+            <div class="habit-check-circle">
+              <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+            </div>
+            <div class="habit-title-line">Mindfulness</div>
+          </div>
+
+        </div>
+      </section>
+
+      <!-- Minimal Studio Footer -->
+      <footer class="planner-footer">
+        <span>mortalpages studio &bull; all rights reserved</span>
+        <span>4:3 Portrait Standard &bull; Page Ref: D-01</span>
+      </footer>
+
+    </main>
+
+  </div>
+
+</body>
+</html>

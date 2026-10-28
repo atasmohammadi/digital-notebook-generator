@@ -1,0 +1,296 @@
+import Foundation
+import PDFKit
+import CoreGraphics
+import AppKit
+
+public class PDFLinkEngine {
+    public static func process(config: NotebookConfig, progress: @escaping (Double, String) -> Void) throws -> (outputPath: String, linksCount: Int, duration: Double, fileSizeMB: Double) {
+        let startTime = Date()
+        
+        progress(0.05, "Opening PDF documents...")
+        guard FileManager.default.fileExists(atPath: config.targetPDFPath) else {
+            throw NSError(domain: "StudioEngine", code: 404, userInfo: [NSLocalizedDescriptionKey: "Target Canva PDF not found at \(config.targetPDFPath)"])
+        }
+        guard FileManager.default.fileExists(atPath: config.templatePDFPath) else {
+            throw NSError(domain: "StudioEngine", code: 404, userInfo: [NSLocalizedDescriptionKey: "Template PDF not found at \(config.templatePDFPath)"])
+        }
+        
+        guard let canvaDoc = PDFDocument(url: URL(fileURLWithPath: config.targetPDFPath)),
+              let templateDoc = PDFDocument(url: URL(fileURLWithPath: config.templatePDFPath)),
+              let cgPDFDoc = CGPDFDocument(URL(fileURLWithPath: config.targetPDFPath) as CFURL) else {
+            throw NSError(domain: "StudioEngine", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not initialize CoreGraphics PDF readers."])
+        }
+        
+        // 1. Extract Master Sidebar from layout page
+        progress(0.15, "Extracting master layout sidebar...")
+        guard let masterPage = canvaDoc.page(at: config.masterLayoutPageIndex - 1) else {
+            throw NSError(domain: "StudioEngine", code: 500, userInfo: [NSLocalizedDescriptionKey: "Could not access Canva master layout page (page \(config.masterLayoutPageIndex))."])
+        }
+        
+        let masterBounds = masterPage.bounds(for: .mediaBox)
+        let sidebarWidth: CGFloat = config.sidebarWidth
+        let sidebarCropRect = CGRect(x: 0, y: 0, width: sidebarWidth, height: masterBounds.height)
+        
+        let renderScale: CGFloat = 3.0 // High DPI vector fidelity
+        let pixelW = Int(sidebarCropRect.width * renderScale)
+        let pixelH = Int(sidebarCropRect.height * renderScale)
+        
+        let repSidebar = NSBitmapImageRep(
+            bitmapDataPlanes: nil, pixelsWide: pixelW, pixelsHigh: pixelH,
+            bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+            colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 32
+        )!
+        NSGraphicsContext.saveGraphicsState()
+        let nctx = NSGraphicsContext(bitmapImageRep: repSidebar)!
+        NSGraphicsContext.current = nctx
+        let cg = nctx.cgContext
+        cg.scaleBy(x: renderScale, y: renderScale)
+        masterPage.draw(with: .mediaBox, to: cg)
+        NSGraphicsContext.restoreGraphicsState()
+        guard let sidebarCG = repSidebar.cgImage else {
+            throw NSError(domain: "StudioEngine", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to render master sidebar image."])
+        }
+        
+        // 2. Prepare Watermark (Layout Crop, Custom Styled Text, or None)
+        progress(0.25, "Preparing watermark graphics...")
+        var activeWatermarkCG: CGImage? = nil
+        var activeWatermarkDrawnRect: CGRect = .zero
+        var activeWatermarkRotation: Double = 0.0
+        
+        switch config.watermarkSettings.mode {
+        case .none:
+            activeWatermarkCG = nil
+            
+        case .extractedFromLayout:
+            let wmRect = CGRect(
+                x: config.watermarkSettings.layoutCropX,
+                y: config.watermarkSettings.layoutCropY,
+                width: config.watermarkSettings.layoutCropW,
+                height: config.watermarkSettings.layoutCropH
+            )
+            let wmPixelW = Int(wmRect.width * renderScale)
+            let wmPixelH = Int(wmRect.height * renderScale)
+            
+            if let repWM = NSBitmapImageRep(
+                bitmapDataPlanes: nil, pixelsWide: wmPixelW, pixelsHigh: wmPixelH,
+                bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false,
+                colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 32
+            ) {
+                NSGraphicsContext.saveGraphicsState()
+                if let wmCtx = NSGraphicsContext(bitmapImageRep: repWM) {
+                    NSGraphicsContext.current = wmCtx
+                    let cgWM = wmCtx.cgContext
+                    cgWM.scaleBy(x: renderScale, y: renderScale)
+                    cgWM.translateBy(x: -wmRect.origin.x, y: -wmRect.origin.y)
+                    masterPage.draw(with: .mediaBox, to: cgWM)
+                }
+                NSGraphicsContext.restoreGraphicsState()
+                
+                for y in 0..<wmPixelH {
+                    for x in 0..<wmPixelW {
+                        if let col = repWM.colorAt(x: x, y: y) {
+                            let r = col.redComponent * 255.0
+                            let g = col.greenComponent * 255.0
+                            let b = col.blueComponent * 255.0
+                            let diff = max(abs(r - 249), abs(g - 249), abs(b - 249))
+                            if diff <= 3 {
+                                repWM.setColor(NSColor(calibratedRed: r/255.0, green: g/255.0, blue: b/255.0, alpha: 0.0), atX: x, y: y)
+                            } else {
+                                let a = min(1.0, diff / 25.0)
+                                repWM.setColor(NSColor(calibratedRed: r/255.0, green: g/255.0, blue: b/255.0, alpha: a), atX: x, y: y)
+                            }
+                        }
+                    }
+                }
+                activeWatermarkCG = repWM.cgImage
+                activeWatermarkDrawnRect = wmRect
+                activeWatermarkRotation = 0.0
+            }
+            
+        case .customText:
+            if let rendered = WatermarkRenderer.renderImage(settings: config.watermarkSettings),
+               let cg = rendered.cgImage {
+                activeWatermarkCG = cg
+                activeWatermarkDrawnRect = rendered.drawnRect
+                activeWatermarkRotation = config.watermarkSettings.rotationDegrees
+            }
+        }
+        
+        let shouldStampPage: (Int) -> Bool = { finalPageNum in
+            guard activeWatermarkCG != nil else { return false }
+            switch config.watermarkSettings.scope {
+            case .allPages:
+                return true
+            case .allExceptCover:
+                return finalPageNum > 1
+            case .contentOnly:
+                return finalPageNum >= 15
+            }
+        }
+        
+        let drawWatermarkOnContext: (CGContext) -> Void = { ctx in
+            guard let cg = activeWatermarkCG else { return }
+            ctx.saveGState()
+            if activeWatermarkRotation != 0.0 {
+                let midX = activeWatermarkDrawnRect.midX
+                let midY = activeWatermarkDrawnRect.midY
+                ctx.translateBy(x: midX, y: midY)
+                ctx.rotate(by: CGFloat(activeWatermarkRotation * .pi / 180.0))
+                let centeredRect = CGRect(
+                    x: -activeWatermarkDrawnRect.width / 2.0,
+                    y: -activeWatermarkDrawnRect.height / 2.0,
+                    width: activeWatermarkDrawnRect.width,
+                    height: activeWatermarkDrawnRect.height
+                )
+                ctx.draw(cg, in: centeredRect)
+            } else {
+                ctx.draw(cg, in: activeWatermarkDrawnRect)
+            }
+            ctx.restoreGState()
+        }
+        
+        // 3. Determine Output File Path
+        let outPath: String
+        if !config.outputPath.isEmpty {
+            outPath = config.outputPath
+        } else {
+            let targetURL = URL(fileURLWithPath: config.targetPDFPath)
+            let dir = targetURL.deletingLastPathComponent()
+            let base = targetURL.deletingPathExtension().lastPathComponent
+            outPath = dir.appendingPathComponent("\(base) - INTERACTIVE.pdf").path
+        }
+        
+        progress(0.40, "Assembling vector pages & applying overlays...")
+        let pdfURL = URL(fileURLWithPath: outPath) as CFURL
+        var mediaBox = CGRect(origin: .zero, size: masterBounds.size)
+        guard let writeContext = CGContext(pdfURL, mediaBox: &mediaBox, nil) else {
+            throw NSError(domain: "StudioEngine", code: 500, userInfo: [NSLocalizedDescriptionKey: "Failed to create destination PDF."])
+        }
+        
+        let tBox = templateDoc.page(at: 1)?.bounds(for: .mediaBox) ?? CGRect(x: 0, y: 0, width: 1536, height: 1980)
+        let sx: CGFloat = masterBounds.width / tBox.width
+        let sy: CGFloat = masterBounds.height / tBox.height
+        
+        var totalLinks = 0
+        let totalCanvaPages = cgPDFDoc.numberOfPages
+        let totalFinalPages = config.excludeMasterLayoutFromOutput ? (totalCanvaPages - 1) : totalCanvaPages
+        
+        // Page 1: Cover
+        if config.hasCover, let coverPage = cgPDFDoc.page(at: config.coverPageIndex) {
+            var coverBox = coverPage.getBoxRect(.mediaBox)
+            writeContext.beginPage(mediaBox: &coverBox)
+            writeContext.addDestination("page_1" as CFString, at: CGPoint(x: 0, y: coverBox.height))
+            writeContext.drawPDFPage(coverPage)
+            if shouldStampPage(1) {
+                drawWatermarkOnContext(writeContext)
+            }
+            writeContext.endPage()
+        }
+        
+        // Content Pages 2..totalFinalPages
+        for finalPageNum in 2...totalFinalPages {
+            let canvaPageNum = config.excludeMasterLayoutFromOutput ? (finalPageNum + 1) : finalPageNum
+            guard let cPage = cgPDFDoc.page(at: canvaPageNum) else { continue }
+            
+            var pageBox = cPage.getBoxRect(.mediaBox)
+            writeContext.beginPage(mediaBox: &pageBox)
+            writeContext.addDestination("page_\(finalPageNum)" as CFString, at: CGPoint(x: 0, y: pageBox.height))
+            writeContext.drawPDFPage(cPage)
+            
+            // Sidebar Overlay Logic
+            let inSkipRange = (finalPageNum >= config.skipSidebarStartPage && finalPageNum <= config.skipSidebarEndPage)
+            if !inSkipRange && finalPageNum >= 15 {
+                let sidebarRect = CGRect(x: 0, y: 0, width: sidebarWidth, height: pageBox.height)
+                writeContext.draw(sidebarCG, in: sidebarRect)
+            }
+            
+            // Watermark Stamp Logic
+            if shouldStampPage(finalPageNum) {
+                drawWatermarkOnContext(writeContext)
+            }
+            
+            // Hyperlink Injection Logic
+            let templatePageIdx = finalPageNum - 1
+            var chapterTabBounds = [CGRect]()
+            
+            if templatePageIdx < templateDoc.pageCount, let tPage = templateDoc.page(at: templatePageIdx) {
+                for a in tPage.annotations {
+                    guard a.type == "Link" else { continue }
+                    if let url = a.url, url.absoluteString.contains("mortalpages") { continue }
+                    let b = a.bounds
+                    if b.origin.y < 80 && b.origin.x > 300 { continue }
+                    
+                    if let dest = a.destination, let dPage = dest.page {
+                        let targetPage = templateDoc.index(for: dPage) + 1
+                        let scaledRect = CGRect(x: b.origin.x * sx, y: b.origin.y * sy, width: b.size.width * sx, height: b.size.height * sy)
+                        writeContext.setDestination("page_\(targetPage)" as CFString, for: scaledRect)
+                        totalLinks += 1
+                        
+                        if scaledRect.origin.x < (sidebarWidth + 20) {
+                            chapterTabBounds.append(scaledRect)
+                        }
+                    }
+                }
+            }
+            
+            // Page 2: Chapter Selection Arrow Hitboxes
+            if finalPageNum == 2 && config.hasChapterArrows {
+                let sortedTabs = chapterTabBounds.sorted { $0.origin.y > $1.origin.y }
+                let arrowX: CGFloat = 804.4
+                let arrowW: CGFloat = config.useSidebarSizeForArrows ? 42.22 : config.customArrowWidth
+                let arrowH: CGFloat = config.useSidebarSizeForArrows ? 101.51 : config.customArrowHeight
+                
+                for (idx, target) in config.arrowTargets.enumerated() {
+                    let arrowY: CGFloat
+                    if idx < sortedTabs.count {
+                        arrowY = sortedTabs[idx].origin.y
+                    } else {
+                        arrowY = 1276.0 - CGFloat(idx) * 105.0
+                    }
+                    let arrowRect = CGRect(x: arrowX - arrowW / 2.0, y: arrowY, width: arrowW, height: arrowH)
+                    writeContext.setDestination("page_\(target)" as CFString, for: arrowRect)
+                    totalLinks += 1
+                }
+            }
+            
+            writeContext.endPage()
+            
+            if finalPageNum % 25 == 0 || finalPageNum == totalFinalPages {
+                let pct = 0.40 + (Double(finalPageNum) / Double(totalFinalPages)) * 0.50
+                progress(pct, "Processing page \(finalPageNum) of \(totalFinalPages)...")
+            }
+        }
+        
+        writeContext.closePDF()
+        
+        // 4. Neutralize Preview Data Detectors (if enabled)
+        if config.watermarkSettings.neutralizeDataDetectors {
+            progress(0.92, "Suppressing Preview URL data detectors...")
+            suppressDataDetectorsInFile(at: outPath)
+        }
+        
+        let duration = Date().timeIntervalSince(startTime)
+        let fileSizeMB = (try? FileManager.default.attributesOfItem(atPath: outPath)[.size] as? Double) ?? 0.0 / (1024.0 * 1024.0)
+        
+        progress(1.0, "Ready! Processed \(totalFinalPages) pages with \(totalLinks) links in \(String(format: "%.2f", duration))s.")
+        return (outputPath: outPath, linksCount: totalLinks, duration: duration, fileSizeMB: fileSizeMB / (1024.0 * 1024.0))
+    }
+    
+    private static func suppressDataDetectorsInFile(at path: String) {
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+              var pdfStr = String(data: data, encoding: .isoLatin1) else { return }
+        
+        let searchPatterns = ["(mortalpages.com)", "(mortalpages)", "(mortal)", "(pages.com)"]
+        var modified = false
+        for pattern in searchPatterns {
+            let replacement = "(" + String(repeating: " ", count: max(1, pattern.count - 2)) + ")"
+            if pdfStr.contains(pattern) {
+                pdfStr = pdfStr.replacingOccurrences(of: pattern, with: replacement)
+                modified = true
+            }
+        }
+        if modified, let outData = pdfStr.data(using: .isoLatin1) {
+            try? outData.write(to: URL(fileURLWithPath: path))
+        }
+    }
+}
