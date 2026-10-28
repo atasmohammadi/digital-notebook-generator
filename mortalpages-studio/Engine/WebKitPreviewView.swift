@@ -89,7 +89,7 @@ public struct WebKitPreviewView: NSViewRepresentable {
             .replacingOccurrences(of: "\n", with: "\\n")
         
         let inlineSetters = customVariables.map {
-            "root.style.setProperty('\($0.key)', '\($0.value)');"
+            "root.style.setProperty('\($0.key)', '\($0.value)', 'important');"
         }.joined(separator: "\n")
         
         let js = """

@@ -11,7 +11,7 @@ public enum EditorMode: String, CaseIterable, Identifiable {
 }
 
 public struct TemplateStudioView: View {
-    @ObservedObject private var themeManager = HTMLThemeManager()
+    @ObservedObject public var themeManager: HTMLThemeManager
     @ObservedObject private var registry = TemplateRegistry.shared
     @Binding public var notebookConfig: NotebookConfig
     
@@ -42,10 +42,12 @@ public struct TemplateStudioView: View {
     }
     
     public init(
+        themeManager: HTMLThemeManager,
         notebookConfig: Binding<NotebookConfig>,
         initialTemplatePath: String? = nil,
         onOpenAIChat: ((String) -> Void)? = nil
     ) {
+        self.themeManager = themeManager
         self._notebookConfig = notebookConfig
         self.initialTemplatePath = initialTemplatePath
         self.onOpenAIChat = onOpenAIChat
@@ -123,63 +125,120 @@ public struct TemplateStudioView: View {
             
             Divider()
             
-            // 2-COLUMN MAIN WORKSPACE (No clipping, stable geometry)
+            // 3-COLUMN MAIN WORKSPACE: Templates Sidebar | Editor & Controls | Live Preview
             HStack(spacing: 0) {
-                // LEFT COLUMN: Controls & Code Editor (Fixed width, never squished)
+                // 1. TEMPLATES SIDEBAR: Full categorized templates library
                 VStack(spacing: 0) {
-                    // 1. Dynamic Template Selector Bar
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Label("Active Template:", systemImage: currentTemplate?.icon ?? "doc.text")
-                                .font(.caption)
-                                .fontWeight(.semibold)
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            
-                            Button(action: {
-                                registry.refreshTemplates()
-                            }) {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                                    .font(.caption2)
-                            }
-                            .buttonStyle(.borderless)
-                            .help("Refresh Template Library")
-                        }
+                    // Header Bar
+                    HStack {
+                        Label("Templates", systemImage: "square.grid.2x2.fill")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
                         
-                        Picker("", selection: Binding(
-                            get: { selectedRelativePath },
-                            set: { newItem in
-                                selectedRelativePath = newItem
-                                loadActiveTemplateContent()
-                            }
-                        )) {
-                            // Group by Category
-                            let grouped = Dictionary(grouping: registry.templates, by: { $0.category })
-                            let categories = grouped.keys.sorted()
-                            
-                            ForEach(categories, id: \.self) { cat in
-                                Section(header: Text(cat)) {
-                                    ForEach(grouped[cat] ?? []) { item in
-                                        HStack {
-                                            Image(systemName: item.icon)
-                                            Text(item.name)
-                                        }
-                                        .tag(item.relativePath)
-                                    }
-                                }
-                            }
+                        Text("(\(registry.templates.count))")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        
+                        Spacer()
+                        
+                        Button(action: { registry.refreshTemplates() }) {
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .font(.caption2)
                         }
-                        .labelsHidden()
-                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderless)
+                        .help("Refresh Template Library")
                     }
                     .padding(.horizontal, 14)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
+                    .padding(.vertical, 10)
                     .background(Color(NSColor.controlBackgroundColor))
                     
                     Divider()
                     
-                    // 2. Editor Mode Switcher (Visual vs HTML vs CSS)
+                    // Categorized Template List
+                    List(selection: $selectedRelativePath) {
+                        let grouped = Dictionary(grouping: registry.templates, by: { $0.category })
+                        let preferredOrder = ["Navigation", "Structure", "Covers", "Grids", "Lined", "Dotted", "Planners", "Trackers", "Custom"]
+                        let categories = grouped.keys.sorted { c1, c2 in
+                            let i1 = preferredOrder.firstIndex(of: c1) ?? 999
+                            let i2 = preferredOrder.firstIndex(of: c2) ?? 999
+                            if i1 != i2 { return i1 < i2 }
+                            return c1 < c2
+                        }
+                        
+                        ForEach(categories, id: \.self) { cat in
+                            Section(header: Text(cat.uppercased())
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.secondary)
+                            ) {
+                                ForEach(grouped[cat] ?? []) { item in
+                                    Button(action: {
+                                        selectedRelativePath = item.relativePath
+                                        loadActiveTemplateContent()
+                                    }) {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: item.icon)
+                                                .font(.caption)
+                                                .frame(width: 16)
+                                                .foregroundColor(selectedRelativePath == item.relativePath ? .accentColor : .secondary)
+                                            
+                                            Text(item.name)
+                                                .font(.subheadline)
+                                                .fontWeight(selectedRelativePath == item.relativePath ? .semibold : .regular)
+                                                .foregroundColor(selectedRelativePath == item.relativePath ? .primary : .secondary)
+                                                .lineLimit(1)
+                                            
+                                            Spacer()
+                                            
+                                            if item.isCustom {
+                                                Text("AI")
+                                                    .font(.system(size: 8, weight: .bold))
+                                                    .padding(.horizontal, 4)
+                                                    .padding(.vertical, 1)
+                                                    .background(Capsule().fill(Color.orange.opacity(0.2)))
+                                                    .foregroundColor(.orange)
+                                            }
+                                        }
+                                        .padding(.vertical, 3)
+                                        .contentShape(Rectangle())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .tag(item.relativePath)
+                                }
+                            }
+                        }
+                    }
+                    .listStyle(.sidebar)
+                }
+                .frame(width: 220)
+                .background(Color(NSColor.windowBackgroundColor).opacity(0.6))
+                
+                Divider()
+                
+                // 2. MIDDLE COLUMN: Controls & Code Editor
+                VStack(spacing: 0) {
+                    // Active Template Header Banner
+                    HStack {
+                        Image(systemName: currentTemplate?.icon ?? "doc.text")
+                            .foregroundColor(.accentColor)
+                        Text(currentTemplate?.name ?? "Template")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+                        Spacer()
+                        Text(currentTemplate?.category ?? "")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(Color(NSColor.controlBackgroundColor)))
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 9)
+                    .background(Color(NSColor.controlBackgroundColor))
+                    
+                    Divider()
+                    
+                    // Editor Mode Switcher (Visual vs HTML vs CSS)
                     HStack {
                         Picker("", selection: $editorMode) {
                             ForEach(EditorMode.allCases) { mode in
@@ -203,7 +262,7 @@ public struct TemplateStudioView: View {
                     
                     Divider()
                     
-                    // 3. Editor / Inspector Body
+                    // Editor / Inspector Body
                     if editorMode == .visual {
                         visualCustomizerContent
                     } else if editorMode == .htmlCode {
@@ -212,7 +271,7 @@ public struct TemplateStudioView: View {
                         IDECodeEditor(text: $rawCSSTokens, language: .css, onSave: saveCodeAndHotReload)
                     }
                 }
-                .frame(width: 440)
+                .frame(width: 420)
                 .background(Color(NSColor.windowBackgroundColor))
                 
                 Divider()
@@ -260,7 +319,7 @@ public struct TemplateStudioView: View {
                         
                         WebKitPreviewView(
                             htmlContent: rawHTMLContent,
-                            baseURL: templateBaseDir.appendingPathComponent("Base"),
+                            baseURL: templateBaseDir.appendingPathComponent(selectedRelativePath).deletingLastPathComponent(),
                             customVariables: themeManager.activeTheme.variables,
                             zoomFactor: previewZoom
                         )
@@ -328,6 +387,9 @@ public struct TemplateStudioView: View {
         }
         .onChange(of: notebookConfig.themeName) { _ in
             syncWithNotebookConfigTheme()
+        }
+        .onChange(of: themeManager.activeTheme.id) { _ in
+            loadActiveTemplateContent()
         }
     }
     

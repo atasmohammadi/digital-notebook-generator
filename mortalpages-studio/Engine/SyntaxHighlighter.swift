@@ -22,6 +22,22 @@ public class SyntaxHighlighter {
     public static let codeFont = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .regular)
     public static let boldCodeFont = NSFont.monospacedSystemFont(ofSize: 12.5, weight: .semibold)
     
+    // MARK: - HTML Highlighting Pre-compiled Regexes
+    private static let htmlTagRegex = try? NSRegularExpression(pattern: "</?[a-zA-Z0-9\\-_!]+")
+    private static let htmlTagEndRegex = try? NSRegularExpression(pattern: "/?>")
+    private static let htmlAttrRegex = try? NSRegularExpression(pattern: "\\s+([a-zA-Z0-9\\-_:]+)(?=\\=)")
+    private static let htmlStringRegex = try? NSRegularExpression(pattern: "\"[^\"]*\"|'[^']*'")
+    private static let htmlCommentRegex = try? NSRegularExpression(pattern: "<!--[\\s\\S]*?-->")
+    private static let htmlStyleBlockRegex = try? NSRegularExpression(pattern: "<style[\\s\\S]*?>([\\s\\S]*?)</style>", options: .caseInsensitive)
+
+    // MARK: - CSS Highlighting Pre-compiled Regexes
+    private static let cssSelectorRegex = try? NSRegularExpression(pattern: "(?m)^\\s*([.#:]?[a-zA-Z0-9\\-_*\\s,>+~:]+)(?=\\s*\\{)")
+    private static let cssPropertyRegex = try? NSRegularExpression(pattern: "(?m)^\\s*([a-zA-Z0-9\\-_]+)(?=\\s*:)")
+    private static let cssVariableRegex = try? NSRegularExpression(pattern: "--[a-zA-Z0-9\\-_]+")
+    private static let cssNumberRegex = try? NSRegularExpression(pattern: "\\b\\d+(\\.\\d+)?(px|pt|em|rem|%|vh|vw|deg|s|ms|dpi)?\\b")
+    private static let cssStringRegex = try? NSRegularExpression(pattern: "\"[^\"]*\"|'[^']*'")
+    private static let cssCommentRegex = try? NSRegularExpression(pattern: "/\\*[\\s\\S]*?\\*/")
+
     /// Highlights an attributed string in-place
     public static func highlight(attributedString: NSMutableAttributedString, language: CodeLanguage) {
         let string = attributedString.string
@@ -45,31 +61,41 @@ public class SyntaxHighlighter {
     // MARK: - HTML Highlighting
     private static func highlightHTML(in attr: NSMutableAttributedString, string: String, range: NSRange) {
         // 1. Tags: <tag ... > and </tag>
-        applyRegex(pattern: "</?[a-zA-Z0-9\\-_!]+", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: tagColor, range: match)
-            attr.addAttribute(.font, value: boldCodeFont, range: match)
+        if let regex = htmlTagRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: tagColor, range: match)
+                attr.addAttribute(.font, value: boldCodeFont, range: match)
+            }
         }
-        applyRegex(pattern: "/?>", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: tagColor, range: match)
+        if let regex = htmlTagEndRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: tagColor, range: match)
+            }
         }
         
         // 2. Attributes: name=
-        applyRegex(pattern: "\\s+([a-zA-Z0-9\\-_:]+)(?=\\=)", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: attributeColor, range: match)
+        if let regex = htmlAttrRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: attributeColor, range: match)
+            }
         }
         
         // 3. Attribute Strings: "..." or '...'
-        applyRegex(pattern: "\"[^\"]*\"|'[^']*'", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: stringColor, range: match)
+        if let regex = htmlStringRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: stringColor, range: match)
+            }
         }
         
         // 4. Comments: <!-- ... -->
-        applyRegex(pattern: "<!--[\\s\\S]*?-->", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: commentColor, range: match)
+        if let regex = htmlCommentRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: commentColor, range: match)
+            }
         }
         
         // 5. Embedded CSS in <style> ... </style>
-        if let regex = try? NSRegularExpression(pattern: "<style[\\s\\S]*?>([\\s\\S]*?)</style>", options: .caseInsensitive) {
+        if let regex = htmlStyleBlockRegex {
             let matches = regex.matches(in: string, range: range)
             for m in matches where m.numberOfRanges >= 2 {
                 let cssRange = m.range(at: 1)
@@ -83,39 +109,50 @@ public class SyntaxHighlighter {
     // MARK: - CSS Highlighting
     private static func highlightCSS(in attr: NSMutableAttributedString, string: String, range: NSRange) {
         // 1. CSS Selectors (before {)
-        applyRegex(pattern: "(?m)^\\s*([.#:]?[a-zA-Z0-9\\-_*\\s,>+~:]+)(?=\\s*\\{)", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: selectorColor, range: match)
-            attr.addAttribute(.font, value: boldCodeFont, range: match)
+        if let regex = cssSelectorRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: selectorColor, range: match)
+                attr.addAttribute(.font, value: boldCodeFont, range: match)
+            }
         }
         
         // 2. CSS Properties: prop:
-        applyRegex(pattern: "(?m)^\\s*([a-zA-Z0-9\\-_]+)(?=\\s*:)", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: propertyColor, range: match)
+        if let regex = cssPropertyRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: propertyColor, range: match)
+            }
         }
         
         // 3. CSS Custom Variables: --variable-name
-        applyRegex(pattern: "--[a-zA-Z0-9\\-_]+", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: variableColor, range: match)
+        if let regex = cssVariableRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: variableColor, range: match)
+            }
         }
         
         // 4. CSS Numbers & Units: 12px, 1.5em, 100%, 72dpi
-        applyRegex(pattern: "\\b\\d+(\\.\\d+)?(px|pt|em|rem|%|vh|vw|deg|s|ms|dpi)?\\b", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: numberColor, range: match)
+        if let regex = cssNumberRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: numberColor, range: match)
+            }
         }
         
         // 5. CSS Strings
-        applyRegex(pattern: "\"[^\"]*\"|'[^']*'", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: stringColor, range: match)
+        if let regex = cssStringRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: stringColor, range: match)
+            }
         }
         
         // 6. CSS Comments: /* ... */
-        applyRegex(pattern: "/\\*[\\s\\S]*?\\*/", string: string, range: range) { match in
-            attr.addAttribute(.foregroundColor, value: commentColor, range: match)
+        if let regex = cssCommentRegex {
+            applyMatches(regex: regex, string: string, range: range) { match in
+                attr.addAttribute(.foregroundColor, value: commentColor, range: match)
+            }
         }
     }
     
-    private static func applyRegex(pattern: String, string: String, range: NSRange, action: (NSRange) -> Void) {
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return }
+    private static func applyMatches(regex: NSRegularExpression, string: String, range: NSRange, action: (NSRange) -> Void) {
         let matches = regex.matches(in: string, options: [], range: range)
         for match in matches {
             action(match.range)

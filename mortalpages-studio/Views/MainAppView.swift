@@ -25,6 +25,7 @@ public enum NavigationTab: String, CaseIterable, Identifiable {
 public struct MainAppView: View {
     @StateObject private var presetManager = PresetManager()
     @StateObject private var chatManager = AIChatManager()
+    @StateObject private var themeManager = HTMLThemeManager()
     @State private var config = NotebookConfig.defaultLight
     @State private var selectedTab: NavigationTab = .generator
     @State private var showingResetAlert = false
@@ -106,6 +107,7 @@ public struct MainAppView: View {
                     GeneratorView(config: $config)
                 case .templateStudio:
                     TemplateStudioView(
+                        themeManager: themeManager,
                         notebookConfig: $config,
                         initialTemplatePath: studioInitialTemplate,
                         onOpenAIChat: { templatePath in
@@ -126,6 +128,12 @@ public struct MainAppView: View {
                 }
             }
             .frame(minWidth: 700, minHeight: 560)
+            .onAppear {
+                syncHTMLTheme(forPresetName: config.themeName)
+            }
+            .onChange(of: config.themeName) { newName in
+                syncHTMLTheme(forPresetName: newName)
+            }
             .toolbar {
                 ToolbarItemGroup(placement: .automatic) {
                     // Quick Preset Selector in Toolbar
@@ -179,6 +187,24 @@ public struct MainAppView: View {
         if !currentOutput.isEmpty { newConfig.outputPath = currentOutput }
         
         config = newConfig
+        syncHTMLTheme(forPresetName: preset.name)
+    }
+    
+    private func syncHTMLTheme(forPresetName presetName: String) {
+        let name = presetName.lowercased()
+        if let match = themeManager.themes.first(where: { t in
+            let tn = t.name.lowercased()
+            if tn == name { return true }
+            if (name.contains("dark") || name.contains("obsidian")) && (tn.contains("dark") || tn.contains("obsidian")) { return true }
+            if (name.contains("beige") || name.contains("warm")) && (tn.contains("beige") || tn.contains("warm")) { return true }
+            if name.contains("pastel") && tn.contains("pastel") { return true }
+            if (name.contains("light") || name.contains("minimalist")) && (tn.contains("light") || tn.contains("minimalist")) { return true }
+            return false
+        }) {
+            if themeManager.activeTheme.id != match.id {
+                themeManager.activeTheme = match
+            }
+        }
     }
     
     private func autoDetect() {
