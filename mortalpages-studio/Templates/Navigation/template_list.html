@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="../Base/styles.css">
   <style>
     .template-index-header {
-      margin-bottom: 48px;
+      margin-bottom: 36px;
     }
     .template-index-title {
       font-family: var(--font-heading);
@@ -16,54 +16,251 @@
       letter-spacing: 2px;
       text-transform: uppercase;
       color: var(--text-main);
+      margin-bottom: 6px;
+    }
+    .template-index-subtitle {
+      font-family: var(--font-heading);
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      text-transform: uppercase;
     }
     .template-columns {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      column-gap: 80px;
-      row-gap: 40px;
+      column-gap: 50px;
+      row-gap: 32px;
     }
     .template-category {
       position: relative;
-      padding-left: 24px;
-      margin-bottom: 42px;
+      margin-bottom: 28px;
     }
-    .template-category::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 2px;
-      bottom: 2px;
-      width: 4px;
-      background-color: var(--text-secondary);
-      border-radius: 2px;
+    .category-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 14px;
+      border-bottom: 1.5px solid var(--border-medium);
+      padding-bottom: 6px;
     }
     .category-title {
       font-family: var(--font-heading);
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 700;
       letter-spacing: 1.5px;
       text-transform: uppercase;
       color: var(--text-main);
-      margin-bottom: 14px;
     }
-    .template-links {
-      list-style: none;
+    .category-count {
+      font-family: var(--font-heading);
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 600;
+    }
+    
+    /* Grid of Cards */
+    .template-cards-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .template-card {
       display: flex;
       flex-direction: column;
-      gap: 10px;
-    }
-    .template-item a {
-      font-family: var(--font-heading);
-      font-size: 15px;
-      color: var(--text-secondary);
+      align-items: center;
       text-decoration: none;
-      letter-spacing: 0.3px;
-      transition: color 0.15s ease;
+      width: 76px;
       cursor: pointer;
+      transition: transform 0.15s ease;
     }
-    .template-item a:hover {
+    .template-card:hover {
+      transform: translateY(-3px);
+    }
+    
+    /* Thumbnail Page Box */
+    .template-thumb {
+      width: 76px;
+      height: 98px;
+      background-color: var(--page-bg);
+      border: 1px solid var(--border-medium);
+      border-radius: 5px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 6px;
+      display: flex;
+      flex-direction: row;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+    .template-card:hover .template-thumb {
+      border-color: var(--accent-color);
+      box-shadow: 0 5px 12px rgba(0, 0, 0, 0.09);
+    }
+    
+    /* Left mini-spine in thumbnail */
+    .thumb-spine {
+      width: 7px;
+      height: 100%;
+      background-color: var(--tab-bg);
+      border-right: 1px solid var(--border-subtle);
+      flex-shrink: 0;
+    }
+    .thumb-body {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      background-color: var(--page-bg);
+    }
+    
+    .template-card-title {
+      font-family: var(--font-heading);
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      text-align: center;
+      color: var(--text-secondary);
+      line-height: 1.25;
+      transition: color 0.15s ease;
+      word-break: break-word;
+    }
+    .template-card:hover .template-card-title {
       color: var(--accent-color);
+    }
+    
+    /* Vector Patterns */
+    .pattern-grid {
+      background-size: 8px 8px;
+      background-image:
+        linear-gradient(to right, var(--grid-color) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--grid-color) 1px, transparent 1px);
+    }
+    .pattern-lined-spacious {
+      background-size: 100% 12px;
+      background-image: linear-gradient(to bottom, transparent 11px, var(--line-color) 11px);
+    }
+    .pattern-lined-medium {
+      background-size: 100% 8px;
+      background-image: linear-gradient(to bottom, transparent 7px, var(--line-color) 7px);
+    }
+    .pattern-lined-narrow {
+      background-size: 100% 6px;
+      background-image: linear-gradient(to bottom, transparent 5px, var(--line-color) 5px);
+    }
+    .pattern-dotted {
+      background-size: 7px 7px;
+      background-position: center;
+      background-image: radial-gradient(circle, var(--dot-color) 0, var(--dot-color) 1px, transparent 1.5px);
+    }
+    
+    /* Splits */
+    .split-v-half {
+      display: flex;
+      flex-direction: column;
+    }
+    .split-v-half .half-blank {
+      height: 50%;
+    }
+    .split-v-half .half-pattern {
+      height: 50%;
+      border-top: 1px solid var(--border-subtle);
+    }
+    .split-v-half .half-pattern-top {
+      height: 50%;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    
+    .split-v-third-grid {
+      display: flex;
+      flex-direction: column;
+    }
+    .split-v-third-grid .two-thirds-blank {
+      height: 66%;
+    }
+    .split-v-third-grid .one-third-grid {
+      height: 34%;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    .split-v-two-thirds-grid {
+      display: flex;
+      flex-direction: column;
+    }
+    .split-v-two-thirds-grid .two-thirds-grid {
+      height: 66%;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .split-v-two-thirds-grid .one-third-blank {
+      height: 34%;
+    }
+
+    .split-h-half {
+      display: flex;
+      flex-direction: row;
+    }
+    .split-h-half .left-half {
+      width: 50%;
+      height: 100%;
+      border-right: 1px solid var(--border-subtle);
+    }
+    .split-h-half .right-half {
+      width: 50%;
+      height: 100%;
+    }
+    
+    /* Planners & Trackers */
+    .pattern-cal-notes {
+      display: flex;
+      flex-direction: column;
+    }
+    .mini-cal-header {
+      height: 36%;
+      border-bottom: 1px solid var(--border-medium);
+      background-size: 9px 7px;
+      background-image:
+        linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
+    }
+    .mini-cal-body {
+      height: 64%;
+      background-size: 100% 7px;
+      background-image: linear-gradient(to bottom, transparent 6px, var(--line-color) 6px);
+    }
+
+    .pattern-full-cal {
+      background-size: 9px 13px;
+      background-image:
+        linear-gradient(to right, var(--border-medium) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--border-medium) 1px, transparent 1px);
+    }
+
+    .pattern-weekly-cols {
+      background-size: 9.8px 100%;
+      background-image: linear-gradient(to right, var(--border-medium) 1px, transparent 1px);
+    }
+
+    .pattern-weekly-rows {
+      background-size: 100% 14px;
+      background-image: linear-gradient(to bottom, transparent 13px, var(--border-medium) 13px);
+    }
+
+    .pattern-habit-matrix {
+      background-size: 5px 6px;
+      background-position: center;
+      background-image: radial-gradient(circle, var(--accent-color) 0, var(--accent-color) 1px, transparent 1.5px);
+    }
+    
+    .pattern-habit-progress {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-around;
+      padding: 6px 4px;
+    }
+    .mini-bar {
+      height: 5px;
+      border-radius: 2px;
+      background-color: var(--accent-color);
+      opacity: 0.7;
     }
   </style>
 </head>
@@ -100,7 +297,8 @@
 
     <main class="content-area">
       <div class="template-index-header">
-        <h1 class="template-index-title">Template List</h1>
+        <h1 class="template-index-title">Template Directory</h1>
+        <p class="template-index-subtitle">Click any visual thumbnail to jump to that notebook template</p>
       </div>
 
       <div class="template-columns">
@@ -108,44 +306,154 @@
         <div class="column-group">
           <!-- GRID -->
           <div class="template-category">
-            <h2 class="category-title">Grid</h2>
-            <ul class="template-links">
-              <li class="template-item"><a href="#full_grid">full grid</a></li>
-              <li class="template-item"><a href="#blank_grid">blank + grid</a></li>
-              <li class="template-item"><a href="#grid_blank">grid + blank</a></li>
-              <li class="template-item"><a href="#blank_lower_third">blank + ⅓ lower grid</a></li>
-              <li class="template-item"><a href="#upper_two_thirds">⅔ upper grid + blank</a></li>
-            </ul>
-          </div>
-
-          <!-- BLANK -->
-          <div class="template-category">
-            <h2 class="category-title">Blank</h2>
-            <ul class="template-links">
-              <li class="template-item"><a href="#blank">blank</a></li>
-            </ul>
-          </div>
-
-          <!-- DOTTED -->
-          <div class="template-category">
-            <h2 class="category-title">Dotted</h2>
-            <ul class="template-links">
-              <li class="template-item"><a href="#full_dotted">full dotted</a></li>
-              <li class="template-item"><a href="#blank_dotted">blank + dotted</a></li>
-              <li class="template-item"><a href="#dotted_blank">dotted + blank</a></li>
-            </ul>
+            <div class="category-header">
+              <h2 class="category-title">Grid Paper</h2>
+              <span class="category-count">5 templates</span>
+            </div>
+            <div class="template-cards-grid">
+              <a href="#full_grid" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-grid"></div>
+                </div>
+                <span class="template-card-title">Full Grid</span>
+              </a>
+              <a href="#blank_grid" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-v-half">
+                    <div class="half-blank"></div>
+                    <div class="half-pattern pattern-grid"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Blank + Grid</span>
+              </a>
+              <a href="#grid_blank" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-v-half">
+                    <div class="half-pattern-top pattern-grid"></div>
+                    <div class="half-blank"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Grid + Blank</span>
+              </a>
+              <a href="#blank_lower_third" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-v-third-grid">
+                    <div class="two-thirds-blank"></div>
+                    <div class="one-third-grid pattern-grid"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Blank + ⅓ Grid</span>
+              </a>
+              <a href="#upper_two_thirds" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-v-two-thirds-grid">
+                    <div class="two-thirds-grid pattern-grid"></div>
+                    <div class="one-third-blank"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">⅔ Grid + Blank</span>
+              </a>
+            </div>
           </div>
 
           <!-- LINED -->
           <div class="template-category">
-            <h2 class="category-title">Lined</h2>
-            <ul class="template-links">
-              <li class="template-item"><a href="#spacious_line">spacious line</a></li>
-              <li class="template-item"><a href="#medium_line">medium line</a></li>
-              <li class="template-item"><a href="#narrow_line">narrow line</a></li>
-              <li class="template-item"><a href="#medium_line_grid">medium line + grid</a></li>
-              <li class="template-item"><a href="#grid_medium_line">grid + medium line</a></li>
-            </ul>
+            <div class="category-header">
+              <h2 class="category-title">Lined Paper</h2>
+              <span class="category-count">5 templates</span>
+            </div>
+            <div class="template-cards-grid">
+              <a href="#spacious_line" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-lined-spacious"></div>
+                </div>
+                <span class="template-card-title">Spacious</span>
+              </a>
+              <a href="#medium_line" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-lined-medium"></div>
+                </div>
+                <span class="template-card-title">Medium Rule</span>
+              </a>
+              <a href="#narrow_line" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-lined-narrow"></div>
+                </div>
+                <span class="template-card-title">Narrow Rule</span>
+              </a>
+              <a href="#medium_line_grid" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-h-half">
+                    <div class="left-half pattern-lined-medium"></div>
+                    <div class="right-half pattern-grid"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Lined + Grid</span>
+              </a>
+              <a href="#grid_medium_line" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-h-half">
+                    <div class="left-half pattern-grid"></div>
+                    <div class="right-half pattern-lined-medium"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Grid + Lined</span>
+              </a>
+            </div>
+          </div>
+
+          <!-- DOTTED & BLANK -->
+          <div class="template-category">
+            <div class="category-header">
+              <h2 class="category-title">Dotted & Blank</h2>
+              <span class="category-count">4 templates</span>
+            </div>
+            <div class="template-cards-grid">
+              <a href="#full_dotted" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-dotted"></div>
+                </div>
+                <span class="template-card-title">Full Dotted</span>
+              </a>
+              <a href="#blank_dotted" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-v-half">
+                    <div class="half-blank"></div>
+                    <div class="half-pattern pattern-dotted"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Blank + Dotted</span>
+              </a>
+              <a href="#dotted_blank" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-v-half">
+                    <div class="half-pattern-top pattern-dotted"></div>
+                    <div class="half-blank"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Dotted + Blank</span>
+              </a>
+              <a href="#blank" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body"></div>
+                </div>
+                <span class="template-card-title">Pure Blank</span>
+              </a>
+            </div>
           </div>
         </div>
 
@@ -153,38 +461,164 @@
         <div class="column-group">
           <!-- MONTHLY PLANNER -->
           <div class="template-category">
-            <h2 class="category-title">Monthly Planner</h2>
-            <ul class="template-links">
-              <li class="template-item"><a href="#monthly_notes">calendar + notes</a></li>
-              <li class="template-item"><a href="#monthly_priorities">full calendar + priorities</a></li>
-              <li class="template-item"><a href="#monthly_focus">mini calendar + weekly focus</a></li>
-              <li class="template-item"><a href="#monthly_overview">month overview</a></li>
-              <li class="template-item"><a href="#monthly_details">mini calendar + daily details</a></li>
-              <li class="template-item"><a href="#quarterly_goals">quarterly goals</a></li>
-            </ul>
+            <div class="category-header">
+              <h2 class="category-title">Monthly Planners</h2>
+              <span class="category-count">6 templates</span>
+            </div>
+            <div class="template-cards-grid">
+              <a href="#monthly_notes" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-cal-notes">
+                    <div class="mini-cal-header"></div>
+                    <div class="mini-cal-body"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Cal + Notes</span>
+              </a>
+              <a href="#monthly_priorities" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-full-cal"></div>
+                </div>
+                <span class="template-card-title">Full Calendar</span>
+              </a>
+              <a href="#monthly_focus" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-cal-notes">
+                    <div class="mini-cal-header"></div>
+                    <div class="mini-cal-body pattern-grid"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Monthly Focus</span>
+              </a>
+              <a href="#monthly_overview" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-h-half">
+                    <div class="left-half pattern-full-cal"></div>
+                    <div class="right-half pattern-lined-medium"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Overview</span>
+              </a>
+              <a href="#monthly_details" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-weekly-cols"></div>
+                </div>
+                <span class="template-card-title">Daily Details</span>
+              </a>
+              <a href="#quarterly_goals" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-grid"></div>
+                </div>
+                <span class="template-card-title">Quarterly</span>
+              </a>
+            </div>
           </div>
 
           <!-- WEEKLY PLANNER -->
           <div class="template-category">
-            <h2 class="category-title">Weekly Planner</h2>
-            <ul class="template-links">
-              <li class="template-item"><a href="#weekly_blocks">mini calendar + blocks</a></li>
-              <li class="template-item"><a href="#weekly_columns">mini calendar + columns</a></li>
-              <li class="template-item"><a href="#weekly_rows">mini calendar + rows</a></li>
-              <li class="template-item"><a href="#weekly_grid_cols">grid + columns</a></li>
-              <li class="template-item"><a href="#weekly_cols_grid">columns with grid</a></li>
-              <li class="template-item"><a href="#weekly_rows_grid">rows + grid</a></li>
-              <li class="template-item"><a href="#weekly_rows_mini">rows + grid + mini calendar</a></li>
-            </ul>
+            <div class="category-header">
+              <h2 class="category-title">Weekly Planners</h2>
+              <span class="category-count">7 templates</span>
+            </div>
+            <div class="template-cards-grid">
+              <a href="#weekly_blocks" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-weekly-rows"></div>
+                </div>
+                <span class="template-card-title">Day Blocks</span>
+              </a>
+              <a href="#weekly_columns" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-weekly-cols"></div>
+                </div>
+                <span class="template-card-title">7 Columns</span>
+              </a>
+              <a href="#weekly_rows" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-weekly-rows"></div>
+                </div>
+                <span class="template-card-title">Weekly Rows</span>
+              </a>
+              <a href="#weekly_grid_cols" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-h-half">
+                    <div class="left-half pattern-weekly-cols"></div>
+                    <div class="right-half pattern-grid"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Grid + Cols</span>
+              </a>
+              <a href="#weekly_cols_grid" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-h-half">
+                    <div class="left-half pattern-grid"></div>
+                    <div class="right-half pattern-weekly-cols"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Cols + Grid</span>
+              </a>
+              <a href="#weekly_rows_grid" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body split-v-half">
+                    <div class="half-pattern-top pattern-weekly-rows"></div>
+                    <div class="half-pattern pattern-grid"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Rows + Grid</span>
+              </a>
+              <a href="#weekly_rows_mini" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-cal-notes">
+                    <div class="mini-cal-header"></div>
+                    <div class="mini-cal-body pattern-weekly-rows"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Rows + Cal</span>
+              </a>
+            </div>
           </div>
 
           <!-- HABIT TRACKER -->
           <div class="template-category">
-            <h2 class="category-title">Habit Tracker</h2>
-            <ul class="template-links">
-              <li class="template-item"><a href="#habit_yearly">yearly tracker + grid</a></li>
-              <li class="template-item"><a href="#habit_progress">yearly tracker + progress log</a></li>
-            </ul>
+            <div class="category-header">
+              <h2 class="category-title">Habit Trackers</h2>
+              <span class="category-count">2 templates</span>
+            </div>
+            <div class="template-cards-grid">
+              <a href="#habit_yearly" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-habit-matrix"></div>
+                </div>
+                <span class="template-card-title">Yearly Matrix</span>
+              </a>
+              <a href="#habit_progress" class="template-card">
+                <div class="template-thumb">
+                  <div class="thumb-spine"></div>
+                  <div class="thumb-body pattern-habit-progress">
+                    <div class="mini-bar" style="width: 80%;"></div>
+                    <div class="mini-bar" style="width: 60%;"></div>
+                    <div class="mini-bar" style="width: 90%;"></div>
+                    <div class="mini-bar" style="width: 45%;"></div>
+                    <div class="mini-bar" style="width: 75%;"></div>
+                  </div>
+                </div>
+                <span class="template-card-title">Progress Log</span>
+              </a>
+            </div>
           </div>
         </div>
       </div>

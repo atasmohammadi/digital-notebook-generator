@@ -105,6 +105,13 @@ public struct WebKitPreviewView: NSViewRepresentable {
             }
             var root = document.documentElement;
             \(inlineSetters)
+            // Force WebKit to re-render background patterns and gradients immediately
+            if (document.body) {
+                var prev = document.body.style.display;
+                document.body.style.display = 'none';
+                document.body.offsetHeight; // trigger reflow
+                document.body.style.display = prev;
+            }
         })();
         """
         

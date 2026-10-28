@@ -396,104 +396,257 @@ public struct TemplateStudioView: View {
     // MARK: - Visual Customizer Content
     private var visualCustomizerContent: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 20) {
+                // Section Info Header
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Design Tokens & CSS Variables")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.accentColor)
+                    Text("Modify theme styling variables below with real-time vector preview. Colors accept both the visual swatch picker and direct #HEX or rgba() input. Changes hot-reload instantaneously.")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 6).fill(Color.accentColor.opacity(0.08)))
+                
                 // 1. Page Background & Canvas
-                GroupBox(label: Label("Page Canvas & Colors", systemImage: "paintpalette")) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        colorRow(title: "Page Background", varKey: "--page-bg", defaultHex: "#FAF8F5")
-                        colorRow(title: "Main Typography", varKey: "--text-main", defaultHex: "#3C3835")
-                        colorRow(title: "Secondary Text", varKey: "--text-secondary", defaultHex: "#7A736E")
-                        colorRow(title: "Accent / Active Color", varKey: "--accent-color", defaultHex: "#C28E75")
+                GroupBox(label: Label("Page Canvas & Typography", systemImage: "paintpalette.fill")) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        colorRow(
+                            title: "Page Background",
+                            varKey: "--page-bg",
+                            defaultHex: "#FAF8F5",
+                            description: "Base canvas tint applied to all notebook pages"
+                        )
+                        Divider()
+                        colorRow(
+                            title: "Main Typography",
+                            varKey: "--text-main",
+                            defaultHex: "#3C3835",
+                            description: "Headings, titles, numbers, and primary document text"
+                        )
+                        Divider()
+                        colorRow(
+                            title: "Secondary Text",
+                            varKey: "--text-secondary",
+                            defaultHex: "#7A736E",
+                            description: "Subtitles, category labels, rules, and footnote metadata"
+                        )
+                        Divider()
+                        colorRow(
+                            title: "Accent / Active Color",
+                            varKey: "--accent-color",
+                            defaultHex: "#C28E75",
+                            description: "Interactive hyperlinks, active chapter tabs, and focal badges"
+                        )
                     }
-                    .padding(6)
+                    .padding(8)
                 }
                 
                 // 2. Paper Patterns: Grid, Lines & Dots
-                GroupBox(label: Label("Grids, Lined Rules & Dots", systemImage: "ruler")) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        colorRow(title: "Grid Line Color", varKey: "--grid-color", defaultHex: "rgba(60, 56, 53, 0.07)")
-                        sliderRow(title: "Grid Cell Size", varKey: "--grid-size", min: 14, max: 48, unit: "px", defaultVal: 24)
+                GroupBox(label: Label("Grids, Lined Rules & Dots", systemImage: "ruler.fill")) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            colorRow(
+                                title: "Grid Line Color",
+                                varKey: "--grid-color",
+                                defaultHex: "rgba(60, 56, 53, 0.07)",
+                                description: "Color and opacity for squared graph paper notes"
+                            )
+                            sliderRow(
+                                title: "Grid Cell Size",
+                                varKey: "--grid-size",
+                                min: 14,
+                                max: 48,
+                                unit: "px",
+                                defaultVal: 24,
+                                description: "Square dimensions (standard 5mm grid is ~24px)"
+                            )
+                        }
                         
                         Divider()
                         
-                        colorRow(title: "Notebook Line Color", varKey: "--line-color", defaultHex: "rgba(60, 56, 53, 0.12)")
-                        sliderRow(title: "Line Rule Spacing", varKey: "--line-spacing", min: 16, max: 48, unit: "px", defaultVal: 28)
+                        VStack(alignment: .leading, spacing: 8) {
+                            colorRow(
+                                title: "Notebook Line Color",
+                                varKey: "--line-color",
+                                defaultHex: "rgba(60, 56, 53, 0.12)",
+                                description: "Horizontal rule color for lined paper notes"
+                            )
+                            sliderRow(
+                                title: "Line Rule Spacing",
+                                varKey: "--line-spacing",
+                                min: 16,
+                                max: 48,
+                                unit: "px",
+                                defaultVal: 28,
+                                description: "Vertical spacing between ruled lines (college rule is ~28px)"
+                            )
+                        }
                         
                         Divider()
                         
-                        colorRow(title: "Dotted Matrix Color", varKey: "--dot-color", defaultHex: "rgba(60, 56, 53, 0.20)")
-                        sliderRow(title: "Dot Pitch (Spacing)", varKey: "--dot-pitch", min: 12, max: 36, unit: "px", defaultVal: 20)
+                        VStack(alignment: .leading, spacing: 8) {
+                            colorRow(
+                                title: "Dotted Matrix Color",
+                                varKey: "--dot-color",
+                                defaultHex: "rgba(60, 56, 53, 0.20)",
+                                description: "Color and opacity of dot matrix bullet journal grid"
+                            )
+                            sliderRow(
+                                title: "Dot Radius (Size)",
+                                varKey: "--dot-size",
+                                min: 1.0,
+                                max: 4.5,
+                                unit: "px",
+                                defaultVal: 1.5,
+                                description: "Radius of individual dots (1.5px is crisp bullet journal standard)"
+                            )
+                            sliderRow(
+                                title: "Dot Pitch (Spacing)",
+                                varKey: "--dot-pitch",
+                                min: 12,
+                                max: 36,
+                                unit: "px",
+                                defaultVal: 20,
+                                description: "Distance between dots in the matrix (20px is standard 5mm)"
+                            )
+                        }
                     }
-                    .padding(6)
+                    .padding(8)
                 }
                 
                 // 3. Navigation Spine & Tabs
-                GroupBox(label: Label("Navigation Tabs & Sidebar", systemImage: "sidebar.left")) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        colorRow(title: "Tab Inactive Fill", varKey: "--tab-bg", defaultHex: "rgba(225, 220, 212, 0.35)")
-                        colorRow(title: "Tab Inactive Text", varKey: "--tab-text", defaultHex: "#6A635E")
-                        colorRow(title: "Tab Active Fill", varKey: "--tab-active-bg", defaultHex: "#E4C1B4")
-                        colorRow(title: "Tab Active Text", varKey: "--tab-active-text", defaultHex: "#FFFFFF")
+                GroupBox(label: Label("Navigation Tabs & Sidebar Spine", systemImage: "sidebar.left")) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        colorRow(
+                            title: "Tab Inactive Fill",
+                            varKey: "--tab-bg",
+                            defaultHex: "rgba(225, 220, 212, 0.35)",
+                            description: "Translucent background tint for inactive chapter tabs"
+                        )
+                        Divider()
+                        colorRow(
+                            title: "Tab Inactive Text",
+                            varKey: "--tab-text",
+                            defaultHex: "#6A635E",
+                            description: "Numeral and icon color for inactive tabs on the sidebar"
+                        )
+                        Divider()
+                        colorRow(
+                            title: "Tab Active Fill",
+                            varKey: "--tab-active-bg",
+                            defaultHex: "#E4C1B4",
+                            description: "Highlight accent color for the currently opened chapter tab"
+                        )
+                        Divider()
+                        colorRow(
+                            title: "Tab Active Text",
+                            varKey: "--tab-active-text",
+                            defaultHex: "#FFFFFF",
+                            description: "Contrast text color on top of the active tab fill"
+                        )
                     }
-                    .padding(6)
+                    .padding(8)
                 }
             }
             .padding(14)
         }
     }
     
-    // MARK: - Helper Rows
-    private func colorRow(title: String, varKey: String, defaultHex: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.subheadline)
-            Spacer()
-            
-            let currentColor = Color(hex: themeManager.activeTheme.variables[varKey] ?? defaultHex)
-            
-            ColorPicker("", selection: Binding<Color>(
-                get: { currentColor },
-                set: { (newColor: Color) in
-                    let hex = newColor.toHex() ?? defaultHex
-                    themeManager.updateVariable(varKey, value: hex)
+    // MARK: - Helper Rows with HEX & Visual Swatch Pickers
+    private func colorRow(title: String, varKey: String, defaultHex: String, description: String? = nil) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    if let desc = description {
+                        Text(desc)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                            .lineLimit(2)
+                    }
                 }
-            ))
-            .labelsHidden()
-            
-            Text(themeManager.activeTheme.variables[varKey] ?? defaultHex)
-                .font(.caption)
-                .monospaced()
-                .frame(width: 75, alignment: .trailing)
-                .foregroundColor(.secondary)
+                
+                Spacer()
+                
+                let currentStr = themeManager.activeTheme.variables[varKey] ?? defaultHex
+                let currentColor = Color(hex: currentStr)
+                
+                // Native Color Picker Swatch
+                ColorPicker("", selection: Binding<Color>(
+                    get: { currentColor },
+                    set: { (newColor: Color) in
+                        let hex = newColor.toHex() ?? defaultHex
+                        themeManager.updateVariable(varKey, value: hex)
+                    }
+                ))
+                .labelsHidden()
+                .frame(width: 26, height: 24)
+                
+                // Direct HEX / RGBA Text Input Field
+                TextField("#HEX", text: Binding<String>(
+                    get: { themeManager.activeTheme.variables[varKey] ?? defaultHex },
+                    set: { newStr in
+                        var formatted = newStr.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !formatted.hasPrefix("#") && !formatted.hasPrefix("rgba") && !formatted.hasPrefix("rgb") && !formatted.isEmpty {
+                            formatted = "#" + formatted
+                        }
+                        themeManager.updateVariable(varKey, value: formatted)
+                    }
+                ))
+                .font(.system(size: 11, design: .monospaced))
+                .textFieldStyle(.roundedBorder)
+                .frame(width: 96)
+            }
         }
+        .padding(.vertical, 2)
     }
     
-    private func sliderRow(title: String, varKey: String, min: Double, max: Double, unit: String, defaultVal: Double) -> some View {
+    private func sliderRow(title: String, varKey: String, min: Double, max: Double, unit: String, defaultVal: Double, description: String? = nil) -> some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
-                Text(title)
-                    .font(.subheadline)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    if let desc = description {
+                        Text(desc)
+                            .font(.system(size: 10))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
                 Spacer()
+                
                 let currentStr = themeManager.activeTheme.variables[varKey] ?? "\(Int(defaultVal))\(unit)"
                 Text(currentStr)
                     .font(.caption)
+                    .fontWeight(.semibold)
                     .monospaced()
-                    .foregroundColor(.secondary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(Color(NSColor.controlBackgroundColor)))
             }
             
             let valBinding = Binding<Double>(
                 get: {
                     let raw = themeManager.activeTheme.variables[varKey] ?? "\(defaultVal)"
-                    let digits = raw.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+                    let digits = raw.components(separatedBy: CharacterSet(charactersIn: "0123456789.").inverted).joined()
                     return Double(digits) ?? defaultVal
                 },
                 set: { newVal in
-                    themeManager.updateVariable(varKey, value: "\(Int(newVal))\(unit)")
+                    let formatted = unit == "px" && min < 2.0 ? String(format: "%.1fpx", newVal) : "\(Int(newVal))\(unit)"
+                    themeManager.updateVariable(varKey, value: formatted)
                 }
             )
             
-            Slider(value: valBinding, in: min...max, step: 1)
+            Slider(value: valBinding, in: min...max, step: unit == "px" && min < 2.0 ? 0.25 : 1)
         }
+        .padding(.vertical, 2)
     }
     
     // MARK: - New Theme Sheet

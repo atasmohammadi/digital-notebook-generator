@@ -22,41 +22,68 @@ public struct GeneratorView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 // Header Banner
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Digital Notebook Generator")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("Create hyperlinked, interactive digital planners in seconds.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Digital Notebook Generator")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            Text("Create hyperlinked, interactive digital planners in seconds.")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                        Button(action: autoDetectFiles) {
+                            Label("Auto-Detect Open Files", systemImage: "sparkles")
+                        }
+                        .buttonStyle(.bordered)
                     }
-                    Spacer()
-                    Button(action: autoDetectFiles) {
-                        Label("Auto-Detect Open Files", systemImage: "sparkles")
-                    }
-                    .buttonStyle(.bordered)
+                    
+                    GuideCallout(
+                        title: "Autonomous Zero-Canva & Hybrid Compilation Engine",
+                        whatItDoes: "Transforms your notebook configurations, HTML/CSS templates, and design files into a fully interactive digital planner with over 2,800 clickable hyperlinks in less than a second.",
+                        howItWorks: "• Interactive PDF Engine: Direct native CoreGraphics and PDFKit rendering. Injects template paper backgrounds, generates persistent right-side tab navigation, crops master layouts, draws watermark plaques, and compiles high-resolution customer-ready PDFs.\n• Keynote Presentation Sync: Uses AppleScript to drive Apple Keynote. Automatically sets generated pages as slide backgrounds and arranges interactive objects behind presentation layers.",
+                        proTip: "You can compile notebooks either from a Canva PDF export or directly from pure HTML/CSS templates in Template Studio without needing Canva at all.",
+                        icon: "wand.and.stars",
+                        tintColor: .indigo,
+                        isExpanded: false
+                    )
                 }
                 
                 Divider()
                 
                 // File Inputs Section
-                VStack(spacing: 16) {
-                    FileDropZone(
-                        title: "1. Canva Export PDF (Target)",
-                        subtitle: "Drop your exported Canva multi-page PDF here",
-                        systemImage: "arrow.down.doc.fill",
-                        filePath: $config.targetPDFPath,
-                        fileType: "pdf"
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Source Files & Design Assets")
+                        .font(.headline)
+                    
+                    GuideCallout(
+                        title: "Input Asset Roles & Auto-Detection",
+                        whatItDoes: "Specifies the visual pages and hyperlink geometry to compile into the final digital notebook.",
+                        howItWorks: "• 1. Target PDF: The flattened PDF exported from Canva containing your notebook artwork (Cover, dividers, headers, backgrounds).\n• 2. Hyperlink Source PDF: (Optional) A reference PDF containing existing link coordinate frames and metadata to clone.",
+                        proTip: "Click 'Auto-Detect Open Files' to instantly capture the frontmost exported PDF from Keynote or Downloads.",
+                        icon: "doc.badge.plus",
+                        tintColor: .blue,
+                        isExpanded: false
                     )
                     
-                    FileDropZone(
-                        title: "2. Master Template PDF (Hyperlink Source)",
-                        subtitle: "Drop your master template with active links here",
-                        systemImage: "link.badge.plus",
-                        filePath: $config.templatePDFPath,
-                        fileType: "pdf"
-                    )
+                    VStack(spacing: 14) {
+                        FileDropZone(
+                            title: "1. Canva Export PDF (Target)",
+                            subtitle: "Drop your exported Canva multi-page PDF here (covers, dividers, backgrounds)",
+                            systemImage: "arrow.down.doc.fill",
+                            filePath: $config.targetPDFPath,
+                            fileType: "pdf"
+                        )
+                        
+                        FileDropZone(
+                            title: "2. Master Template PDF (Hyperlink Source)",
+                            subtitle: "Drop your master template with active links here (optional link reference)",
+                            systemImage: "link.badge.plus",
+                            filePath: $config.templatePDFPath,
+                            fileType: "pdf"
+                        )
+                    }
                 }
                 
                 // Actions & Engines
@@ -64,12 +91,21 @@ public struct GeneratorView: View {
                     Text("Select Output Engines")
                         .font(.headline)
                     
+                    GuideCallout(
+                        title: "Dual Output Pipelines",
+                        whatItDoes: "Choose whether to build a customer-ready PDF file, update an active Apple Keynote presentation, or both simultaneously.",
+                        howItWorks: "• Interactive PDF: Generates 2,800+ vector link annotations, stamps navigation tabs, embeds watermark plaques, and produces a finished PDF in under 1 second.\n• Keynote Sync: Replaces slide master backdrops in Keynote via AppleScript automation.",
+                        icon: "cpu.fill",
+                        tintColor: .teal,
+                        isExpanded: false
+                    )
+                    
                     HStack(spacing: 20) {
                         Toggle(isOn: $config.generateInteractivePDF) {
                             VStack(alignment: .leading) {
                                 Text("⚡ Generate Interactive PDF")
                                     .fontWeight(.semibold)
-                                Text("Customer-ready clickable PDF in < 1 second")
+                                Text("Customer-ready clickable PDF with 2,800+ links in < 1 second")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -80,7 +116,7 @@ public struct GeneratorView: View {
                             VStack(alignment: .leading) {
                                 Text("🖥 Sync Keynote Presentation")
                                     .fontWeight(.semibold)
-                                Text("Swaps slide backgrounds & sends to back")
+                                Text("Swaps slide backgrounds & sends behind Keynote layers")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }

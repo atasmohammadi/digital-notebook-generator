@@ -17,20 +17,32 @@ public struct ThemePresetsView: View {
     public var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Theme Presets Manager")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                    Text("Save and switch between different notebook themes in 1 click.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Theme Presets Manager")
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Text("Save and switch between different notebook themes in 1 click.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Button(action: { showingAddSheet = true }) {
+                        Label("Save Current as Preset...", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
                 }
-                Spacer()
-                Button(action: { showingAddSheet = true }) {
-                    Label("Save Current as Preset...", systemImage: "plus")
-                }
-                .buttonStyle(.borderedProminent)
+                
+                GuideCallout(
+                    title: "Unified Aesthetic Design Systems",
+                    whatItDoes: "Saves and instantly swaps the entire design language of your digital notebook in a single click.",
+                    howItWorks: "• Preset Bundling: Each preset packages all CSS variables and design tokens together: page paper background (#FAF8F5 cream), text contrast, grid colors and cell sizes (5mm), college-ruled lines, dotted matrix pitch and radius, and active/inactive sidebar navigation tabs.\n• Hot-Reload & PDF Sync: Applying a theme immediately updates live WebKit rendering in Template Studio and configures styling parameters for PDF export.",
+                    proTip: "Design a unique palette in Template Studio, then click 'Save Current as Preset' to keep it in your permanent design library.",
+                    icon: "paintpalette.fill",
+                    tintColor: .indigo,
+                    isExpanded: false
+                )
             }
             
             Divider()

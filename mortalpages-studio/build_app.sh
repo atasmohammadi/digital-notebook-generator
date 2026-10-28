@@ -47,6 +47,7 @@ swiftc -O -parse-as-library \
     "${SCRIPT_DIR}/Views/Components/TemplatePicker.swift" \
     "${SCRIPT_DIR}/Views/Components/AIConfigSheet.swift" \
     "${SCRIPT_DIR}/Views/Components/IDECodeEditor.swift" \
+    "${SCRIPT_DIR}/Views/Components/GuideCallout.swift" \
     "${SCRIPT_DIR}/Views/GeneratorView.swift" \
     "${SCRIPT_DIR}/Views/LayoutConfigView.swift" \
     "${SCRIPT_DIR}/Views/WatermarkConfigView.swift" \

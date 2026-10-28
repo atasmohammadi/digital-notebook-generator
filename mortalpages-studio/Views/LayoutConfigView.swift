@@ -18,55 +18,83 @@ public struct LayoutConfigView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 // Header
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: 6) {
                     Text("Layout & Section Rules")
                         .font(.title2)
                         .fontWeight(.bold)
-                    Text("Configure how pages are structured, cropped, hyperlinked, and which templates are mapped to which pages.")
+                    Text("Configure how pages 1 to 188 are partitioned, mapped to HTML/CSS templates, cropped, and hyperlinked across your digital notebook.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                    
+                    GuideCallout(
+                        title: "188-Page Notebook Architecture & Priority Cascade",
+                        whatItDoes: "Defines the exact page structure and template mapping for all 188 pages of your digital journal.",
+                        howItWorks: "When compiling pages, the engine resolves template assignments using a strict 4-tier priority cascade:\n1. Custom Page Rules (Highest priority: overrides any page or page range)\n2. Individual Chapter Overrides (Applies to specific chapters 1–12)\n3. General Templates Slot Rotation (Cycles round-robin through slots on Pages 16–44)\n4. Structural & Default Templates (Cover, Dividers, Index, and Default Note paper)",
+                        proTip: "Changes saved here apply immediately to both real-time PDF generation and Keynote presentation sync.",
+                        icon: "square.stack.3d.up.fill",
+                        tintColor: .indigo,
+                        isExpanded: false
+                    )
                 }
                 
                 Divider()
                 
                 // SECTION 1: MASTER PAGE & SECTION TEMPLATE MAPPING
                 GroupBox(label: Label("Page & Section Template Mapping", systemImage: "rectangle.3.group.fill")) {
-                    VStack(alignment: .leading, spacing: 16) {
-                        Text("Choose which HTML/CSS template (built-in or AI-generated) is drawn for each section of your 188-page digital notebook.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 18) {
                         
                         // 1. Structural Pages Mapping
-                        VStack(spacing: 12) {
-                            TemplatePicker("Cover Page (Page 1):", selection: $config.templateMapping.coverTemplate)
-                            Divider()
-                            TemplatePicker("Chapter Selection / Index (Page 2):", selection: $config.templateMapping.chapterSelectionTemplate)
-                            Divider()
-                            TemplatePicker("Chapter Cover Dividers (Pages 3–14):", selection: $config.templateMapping.chapterDividerTemplate)
-                            Divider()
-                            TemplatePicker("Template Library Index (Page 15):", selection: $config.templateMapping.templateListTemplate)
+                        VStack(alignment: .leading, spacing: 10) {
+                            GuideCallout(
+                                title: "Structural Architecture (Pages 1–15)",
+                                whatItDoes: "Establishes the fixed navigational skeleton of the notebook: Front Cover, Chapter Index, Chapter Divider pages, and the Template Library Directory.",
+                                howItWorks: "• Cover Page (Page 1): Front presentation cover; master sidebar navigation is hidden.\n• Chapter Selection / Index (Page 2): 12 interactive chapter buttons linking directly to chapter start pages (45, 57, 69...).\n• Chapter Cover Dividers (Pages 3–14): Full-page tabbed dividers separating each chapter with native colored tabs.\n• Template Library Index (Page 15): Interactive visual catalog of note paper templates with clickable miniature preview cards.",
+                                icon: "building.columns.fill",
+                                tintColor: .blue,
+                                isExpanded: false
+                            )
+                            
+                            VStack(spacing: 12) {
+                                TemplatePicker("Cover Page (Page 1):", selection: $config.templateMapping.coverTemplate)
+                                Divider()
+                                TemplatePicker("Chapter Selection / Index (Page 2):", selection: $config.templateMapping.chapterSelectionTemplate)
+                                Divider()
+                                TemplatePicker("Chapter Cover Dividers (Pages 3–14):", selection: $config.templateMapping.chapterDividerTemplate)
+                                Divider()
+                                TemplatePicker("Template Library Index (Page 15):", selection: $config.templateMapping.templateListTemplate)
+                            }
+                            .padding(10)
+                            .background(Color(NSColor.controlBackgroundColor))
+                            .cornerRadius(8)
                         }
-                        .padding(10)
-                        .background(Color(NSColor.controlBackgroundColor))
-                        .cornerRadius(8)
                         
                         Divider().padding(.vertical, 4)
                         
                         // 2. General Templates Section (Pages 16-44)
                         VStack(alignment: .leading, spacing: 10) {
+                            GuideCallout(
+                                title: "General Templates Collection (Pages 16–44)",
+                                whatItDoes: "Pages 16 to 44 (29 consecutive pages) form the general templates showcase section. This section provides users with quick access to everyday note pages (Grid, Dotted paper, Lined paper, Habit trackers, etc.) right after the template directory without entering a specific chapter.",
+                                howItWorks: "Round-Robin Slot Rotation: The compiler cycles continuously through each defined slot in order (Slot 1 → Slot 2 → Slot 3 → Slot 4 → Slot 1...). For example:\n• Page 16 = Slot 1\n• Page 17 = Slot 2\n• Page 18 = Slot 3\n• Page 19 = Slot 4\n• Page 20 = Slot 1 ... repeating all the way through Page 44.\nClick 'Add Template' to insert a new slot, or the trash icon to remove a slot. Slots cycle seamlessly across all 29 pages.",
+                                proTip: "If you only define 1 slot, all 29 pages use that single template. If you define 2 slots (e.g. Blank + Grid), pages will alternate back and forth throughout the section.",
+                                icon: "arrow.triangle.2.circlepath",
+                                tintColor: .teal,
+                                isExpanded: true
+                            )
+                            
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("General Templates Collection (Pages 16–44)")
+                                    Text("Active Slots in Rotation")
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
-                                    Text("These 29 pages rotate through the selected templates below:")
+                                    Text("These 29 pages rotate through the defined slots below:")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                 }
                                 Spacer()
                                 
                                 Button(action: addGeneralTemplate) {
-                                    Label("Add Template", systemImage: "plus.circle.fill")
+                                    Label("Add Template Slot", systemImage: "plus.circle.fill")
                                 }
                                 .controlSize(.small)
                             }
@@ -76,8 +104,9 @@ public struct LayoutConfigView: View {
                                     HStack {
                                         Text("Slot \(index + 1):")
                                             .font(.caption)
-                                            .foregroundColor(.secondary)
-                                            .frame(width: 50, alignment: .leading)
+                                            .fontWeight(.semibold)
+                                            .foregroundColor(.accentColor)
+                                            .frame(width: 55, alignment: .leading)
                                         
                                         let binding = Binding<String>(
                                             get: { config.templateMapping.generalTemplates[index] },
@@ -107,9 +136,15 @@ public struct LayoutConfigView: View {
                         
                         // 3. Chapter Notes Pages (Pages 45-188)
                         VStack(alignment: .leading, spacing: 10) {
-                            Text("Chapter Notes Section (Pages 45–188)")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
+                            GuideCallout(
+                                title: "Chapter Notes Section (Pages 45–188)",
+                                whatItDoes: "The primary writing body containing 12 distinct chapters, with exactly 12 pages allocated per chapter (144 pages total: 12 chapters × 12 pages = 144 pages).",
+                                howItWorks: "• Subchapter Header Covers: The entry page of each chapter (Pages 45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177) renders the Subchapter Header template with the chapter title, index jump buttons, and overview metadata.\n• Default Chapter Notes Template: Stamped on the remaining 11 pages of every chapter (e.g. Pages 46–56 for Chapter 1, 58–68 for Chapter 2).\n• Individual Chapter Overrides (Chapters 1–12): Allows customizing specific chapters (e.g. Chapter 1 = Fitness Log, Chapter 2 = Expense Tracker, Chapter 3 = Cornell Notes) while keeping other chapters on the default note paper.",
+                                proTip: "Subchapter header covers are preserved even when you set an individual chapter override.",
+                                icon: "books.vertical.fill",
+                                tintColor: .purple,
+                                isExpanded: false
+                            )
                             
                             VStack(spacing: 12) {
                                 TemplatePicker("Subchapter Header Covers (Pages 45, 57, 69...):", selection: $config.templateMapping.subchapterCoverTemplate)
@@ -183,12 +218,22 @@ public struct LayoutConfigView: View {
                         
                         // 4. Custom Page Overrides (Arbitrary Page Ranges)
                         VStack(alignment: .leading, spacing: 10) {
+                            GuideCallout(
+                                title: "Custom Page Rules & Overrides",
+                                whatItDoes: "Allows you to target any individual page or page range (e.g., '16-24', '50', '100-110') with a specific template.",
+                                howItWorks: "Highest Compilation Priority: Custom page rules take absolute precedence over all other section mappings (General rotation, Chapter defaults, and Chapter overrides). If a page matches a custom rule, that template is rendered unconditionally.",
+                                proTip: "Use custom page rules for special insert sections such as Quarterly Reviews, Goal Planners, or Year-at-a-Glance sheets.",
+                                icon: "star.fill",
+                                tintColor: .orange,
+                                isExpanded: false
+                            )
+                            
                             HStack {
                                 VStack(alignment: .leading, spacing: 2) {
-                                    Text("Custom Page Rules & Overrides")
+                                    Text("Active Custom Page Rules")
                                         .font(.subheadline)
                                         .fontWeight(.semibold)
-                                    Text("Assign any custom or AI template to specific individual pages or page ranges (e.g. \"20-25\", \"50\"):")
+                                    Text("Rules with highest priority override:")
                                         .font(.caption2)
                                         .foregroundColor(.secondary)
                                 }
@@ -259,6 +304,15 @@ public struct LayoutConfigView: View {
                 // SECTION 2: Master Layout Page & Sidebar (Canva / Legacy)
                 GroupBox(label: Label("Master Layout Page & Sidebar Navigation", systemImage: "sidebar.left")) {
                     VStack(alignment: .leading, spacing: 14) {
+                        GuideCallout(
+                            title: "Sidebar Crop & Layout Extraction",
+                            whatItDoes: "Controls how the persistent navigation strip is extracted from your Canva source file and stamped onto pages.",
+                            howItWorks: "• Exclude Master Layout Page: When enabled, Canva Page 2 (the layout source) is excluded from the customer PDF so the document opens smoothly from Cover to Chapter Selection.\n• Master Layout Page Index: Specifies which page in your Canva PDF holds the master sidebar design (default: Page 2).\n• Sidebar Strip Crop Width: The width in points (default: 60pt) cropped from the right edge of the master layout to create the persistent navigation strip across all pages.",
+                            icon: "crop",
+                            tintColor: .teal,
+                            isExpanded: false
+                        )
+                        
                         Toggle("Exclude Master Layout Page from final customer PDF", isOn: $config.excludeMasterLayoutFromOutput)
                             .help("Omits Canva Page 2 from the customer PDF so Cover goes straight to Chapter Selection.")
                         
@@ -286,6 +340,15 @@ public struct LayoutConfigView: View {
                 // SECTION 3: Chapter Selection Arrows (Page 2)
                 GroupBox(label: Label("Chapter Selection Arrows (Page 2)", systemImage: "arrow.right.circle.fill")) {
                     VStack(alignment: .leading, spacing: 14) {
+                        GuideCallout(
+                            title: "Chapter Selection Arrows (Page 2)",
+                            whatItDoes: "Places invisible, high-precision vector hyperlink hitboxes over the 12 chapter buttons/arrows on Page 2.",
+                            howItWorks: "• Arrow Target Pages: Clicking arrow #1 jumps to Page 45 (Chapter 1), #2 jumps to Page 57 (Chapter 2), #3 jumps to Page 69 (Chapter 3), and so on in 12-page intervals.\n• Match Sidebar Tab Dimensions: When enabled, reuses standard 42.2 × 101.5 pt tab button hitbox coordinates. Disable to enter custom width and height if your arrow artwork has unique proportions.",
+                            icon: "arrow.right.circle.fill",
+                            tintColor: .indigo,
+                            isExpanded: false
+                        )
+                        
                         Toggle("Enable 12 Chapter Arrow Hyperlinks", isOn: $config.hasChapterArrows)
                         
                         Toggle("Match Sidebar Tab Dimensions (42.2 x 101.5 pt)", isOn: $config.useSidebarSizeForArrows)
@@ -326,9 +389,14 @@ public struct LayoutConfigView: View {
                 // SECTION 4: Colored Chapter Tabs Range
                 GroupBox(label: Label("Colored Chapter Tabs (Native Design)", systemImage: "paintpalette.fill")) {
                     VStack(alignment: .leading, spacing: 14) {
-                        Text("These pages already have their own colored tabs drawn in Canva/HTML. The master sidebar overlay is automatically skipped on these pages, while keeping all sidebar tab hyperlinks active.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                        GuideCallout(
+                            title: "Colored Chapter Tabs Range (Native Design)",
+                            whatItDoes: "Preserves custom colored tab artwork on Chapter Divider pages by skipping the generic master sidebar overlay.",
+                            howItWorks: "• Skip master sidebar on Final Pages (default: 3 to 14): Pages 3–14 are Chapter Divider pages with pre-designed colored tabs. On these pages, the compiler does not stamp the gray master sidebar graphic over the page, preventing visual clashes while keeping all 12 tab hyperlinks fully clickable.",
+                            icon: "paintpalette.fill",
+                            tintColor: .purple,
+                            isExpanded: false
+                        )
                         
                         HStack {
                             Text("Skip master sidebar on Final Pages:")

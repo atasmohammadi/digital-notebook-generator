@@ -44,13 +44,23 @@ public struct WatermarkConfigView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     // Header
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 6) {
                         Text("Watermark & Branding Studio")
                             .font(.title2)
                             .fontWeight(.bold)
                         Text("Design a custom Canva-style watermark or extract from your master layout.")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
+                        
+                        GuideCallout(
+                            title: "Branding Plaque & Watermark Engine",
+                            whatItDoes: "Stamps an authentic brand watermark, copyright signature, or frosted acrylic plaque onto designated notebook pages.",
+                            howItWorks: "• Pure Code Plaque (SVG / CoreGraphics): Renders vector typography with customizable font, size, 3D embossing, drop shadows, glow, and optional frosted container pill with rounded corners.\n• Extracted from Master Layout: Crops the watermark directly from Canva Page 2, strips the background color, and stamps the artwork.\n• Page Scope: Choose which pages receive the watermark (All Pages, General & Notes, Notes Only, or Cover & Notes).",
+                            proTip: "Enable 'Suppress Preview App URL link detector' to prevent Apple Preview from auto-converting '@mortalpages' text into blue browser links.",
+                            icon: "signature",
+                            tintColor: .indigo,
+                            isExpanded: false
+                        )
                     }
                     
                     Divider()
@@ -58,6 +68,10 @@ public struct WatermarkConfigView: View {
                     // 1. Watermark Source Mode & Scope
                     GroupBox(label: Label("Watermark Mode & Page Scope", systemImage: "sparkles")) {
                         VStack(alignment: .leading, spacing: 14) {
+                            Text("Choose between sharp vector-rendered plaques or cropping existing artwork from your Canva master layout.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                            
                             Picker("Source:", selection: $config.watermarkSettings.mode) {
                                 ForEach(WatermarkSourceMode.allCases) { mode in
                                     Text(mode.rawValue).tag(mode)
@@ -75,6 +89,10 @@ public struct WatermarkConfigView: View {
                                 }
                                 .frame(width: 260)
                             }
+                            
+                            Text("Page Scope controls which sections receive the mark. 'General & Notes' keeps Cover and Structural Dividers clean.")
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
                             
                             Toggle("Suppress Preview App URL link detector", isOn: $config.watermarkSettings.neutralizeDataDetectors)
                                 .font(.subheadline)
