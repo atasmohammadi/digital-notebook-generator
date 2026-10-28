@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 import UniformTypeIdentifiers
 
 public struct FileDropZone: View {
@@ -18,6 +19,10 @@ public struct FileDropZone: View {
         self.fileType = fileType
     }
     
+    private var fileExists: Bool {
+        !filePath.isEmpty && FileManager.default.fileExists(atPath: filePath)
+    }
+    
     public var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -25,13 +30,33 @@ public struct FileDropZone: View {
                     .font(.headline)
                 Spacer()
                 if !filePath.isEmpty {
-                    Button(action: {
-                        selectFile()
-                    }) {
-                        Text("Change...")
-                            .font(.caption)
+                    HStack(spacing: 12) {
+                        Button(action: openFile) {
+                            Label("Open", systemImage: "arrow.up.forward.app")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(fileExists ? .accentColor : .secondary)
+                        .disabled(!fileExists)
+                        .help("Open in Preview or default viewer")
+                        
+                        Button(action: revealInFinder) {
+                            Label("Reveal", systemImage: "folder")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundColor(fileExists ? .accentColor : .secondary)
+                        .disabled(!fileExists)
+                        .help("Reveal in Finder")
+                        
+                        Button(action: {
+                            selectFile()
+                        }) {
+                            Text("Change...")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.link)
                     }
-                    .buttonStyle(.link)
                 }
             }
             
@@ -59,32 +84,106 @@ public struct FileDropZone: View {
                     }
                     .padding()
                 } else {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 14) {
                         Image(systemName: "doc.fill")
-                            .font(.system(size: 32))
-                            .foregroundColor(.accentColor)
+                            .font(.system(size: 34))
+                            .foregroundColor(fileExists ? .accentColor : .secondary)
+                        
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(URL(fileURLWithPath: filePath).lastPathComponent)
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .lineLimit(1)
+                            HStack(spacing: 6) {
+                                Text(URL(fileURLWithPath: filePath).lastPathComponent)
+                                    .font(.subheadline)
+                                    .fontWeight(.semibold)
+                                    .lineLimit(1)
+                                
+                                if !fileExists {
+                                    Text("(File Not Found)")
+                                        .font(.caption2)
+                                        .foregroundColor(.red)
+                                }
+                            }
+                            
                             Text(filePath)
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
                                 .lineLimit(1)
                                 .truncationMode(.middle)
+                            
+                            // Action Buttons
+                            HStack(spacing: 8) {
+                                Button(action: openFile) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "arrow.up.forward.app")
+                                        Text("Open File")
+                                    }
+                                    .font(.caption2)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .disabled(!fileExists)
+                                .help("Open in Preview or default application")
+                                
+                                Button(action: revealInFinder) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "folder")
+                                        Text("Reveal in Finder")
+                                    }
+                                    .font(.caption2)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .disabled(!fileExists)
+                                .help("Reveal file in macOS Finder")
+                            }
+                            .padding(.top, 2)
                         }
+                        
                         Spacer()
+                        
                         Button(action: { filePath = "" }) {
                             Image(systemName: "xmark.circle.fill")
                                 .foregroundColor(.secondary)
+                                .font(.system(size: 16))
                         }
                         .buttonStyle(.plain)
+                        .help("Clear selection")
                     }
-                    .padding()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .contentShape(Rectangle())
+                    .contextMenu {
+                        Button(action: openFile) {
+                            Label("Open File", systemImage: "arrow.up.forward.app")
+                        }
+                        .disabled(!fileExists)
+                        
+                        Button(action: revealInFinder) {
+                            Label("Reveal in Finder", systemImage: "folder")
+                        }
+                        .disabled(!fileExists)
+                        
+                        Divider()
+                        
+                        Button(action: {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(filePath, forType: .string)
+                        }) {
+                            Label("Copy File Path", systemImage: "doc.on.doc")
+                        }
+                        
+                        Button(action: selectFile) {
+                            Label("Change File...", systemImage: "pencil")
+                        }
+                        
+                        Divider()
+                        
+                        Button(role: .destructive, action: { filePath = "" }) {
+                            Label("Clear", systemImage: "trash")
+                        }
+                    }
                 }
             }
-            .frame(height: 100)
+            .frame(minHeight: 104)
             .onDrop(of: [UTType.fileURL.identifier], isTargeted: $isTargeted) { providers in
                 guard let provider = providers.first else { return false }
                 _ = provider.loadObject(ofClass: URL.self) { url, _ in
@@ -97,6 +196,16 @@ public struct FileDropZone: View {
                 return true
             }
         }
+    }
+    
+    private func openFile() {
+        guard fileExists else { return }
+        NSWorkspace.shared.open(URL(fileURLWithPath: filePath))
+    }
+    
+    private func revealInFinder() {
+        guard fileExists else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: filePath)])
     }
     
     private func selectFile() {
