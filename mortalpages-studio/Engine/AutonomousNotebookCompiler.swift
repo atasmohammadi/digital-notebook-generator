@@ -11,6 +11,7 @@ public class AutonomousNotebookCompiler {
         public var watermarkSettings: WatermarkSettings
         public var chapterNavSettings: ChapterNavIndicatorSettings
         public var templateMapping: NotebookTemplateMapping
+        public var pageOverrides: [Int: PageConfigOverride]
         public var totalPages: Int // Default 188
         public var outputPath: String
         public var autoCompressPDF: Bool
@@ -21,6 +22,7 @@ public class AutonomousNotebookCompiler {
             watermarkSettings: WatermarkSettings = .defaultSettings,
             chapterNavSettings: ChapterNavIndicatorSettings = .defaultSettings,
             templateMapping: NotebookTemplateMapping = .defaultMapping,
+            pageOverrides: [Int: PageConfigOverride] = [:],
             totalPages: Int = 188,
             outputPath: String = "",
             autoCompressPDF: Bool = true,
@@ -30,6 +32,7 @@ public class AutonomousNotebookCompiler {
             self.watermarkSettings = watermarkSettings
             self.chapterNavSettings = chapterNavSettings
             self.templateMapping = templateMapping
+            self.pageOverrides = pageOverrides
             self.totalPages = totalPages
             self.outputPath = outputPath
             self.autoCompressPDF = autoCompressPDF
@@ -355,13 +358,16 @@ public class AutonomousNotebookCompiler {
         // Cache rendered master template components on demand
         var renderedComponentsCache: [String: RenderedComponent] = [:]
         
-        let getRenderedComponent: (String, String) -> RenderedComponent? = { relPath, activeDest in
-            let cacheKey = "\(relPath):\(activeDest)"
+        let getRenderedComponent: (String, String, PageConfigOverride?) -> RenderedComponent? = { relPath, activeDest, pageCustom in
+            let cacheKey = "\(relPath):\(activeDest)\(pageCustom != nil ? ":custom_\(pageCustom!.pageNumber)" : "")"
             if let cached = renderedComponentsCache[cacheKey] {
                 return cached
             }
-            let html = loadAndPrepareHTML(relPath, activeDest)
+            var html = loadAndPrepareHTML(relPath, activeDest)
             guard !html.isEmpty else { return nil }
+            if let custom = pageCustom {
+                html = PageHTMLCustomizer.customize(html: html, with: custom)
+            }
             if let comp = try? renderHTMLComponent(html: html) {
                 renderedComponentsCache[cacheKey] = comp
                 return comp
@@ -386,6 +392,9 @@ public class AutonomousNotebookCompiler {
             writeContext.beginPage(mediaBox: &box)
             writeContext.addDestination("page_\(p)" as CFString, at: CGPoint(x: 0, y: box.height))
             
+            // Check for per-page visual and link overrides
+            let pageCustom = options.pageOverrides[p]
+            
             // Determine active destination tab for page p
             let activeDest: String
             if p == 1 {
@@ -403,7 +412,7 @@ public class AutonomousNotebookCompiler {
             
             // Resolve template for page dynamically
             let templateRelPath = options.templateMapping.resolveTemplate(forPage: p, arrowTargets: noteSectionStarts)
-            if let comp = getRenderedComponent(templateRelPath, activeDest) {
+            if let comp = getRenderedComponent(templateRelPath, activeDest, pageCustom) {
                 writeContext.drawPDFPage(comp.pdfPage)
                 
                 if masterTabs.isEmpty {
@@ -419,16 +428,21 @@ public class AutonomousNotebookCompiler {
                 // Inject Navigation Tabs on Pages 2..totalPages
                 if p >= 2 {
                     for tab in activeTabs {
-                        let targetPage: Int
+                        let defaultTarget: Int
                         if tab.dest == "home" {
-                            targetPage = 2
+                            defaultTarget = 2
                         } else if tab.dest == "templates" {
-                            targetPage = 15
+                            defaultTarget = 15
                         } else if tab.dest.hasPrefix("ch") {
                             let chNum = Int(tab.dest.dropFirst(2)) ?? 1
-                            targetPage = chNum + 2 // Pages 3..14
+                            defaultTarget = chNum + 2 // Pages 3..14
                         } else {
-                            targetPage = 2
+                            defaultTarget = 2
+                        }
+                        
+                        let targetPage = pageCustom?.linkOverrides[tab.dest]?.targetPage ?? defaultTarget
+                        if pageCustom?.linkOverrides[tab.dest]?.isEnabled == false {
+                            continue
                         }
                         
                         if targetPage <= totalPages {
@@ -444,7 +458,15 @@ public class AutonomousNotebookCompiler {
                     for card in cards {
                         let chNum = Int(card.dest.dropFirst(2)) ?? (card.index + 1)
                         if chNum >= 1 && chNum <= 12 {
-                            let target = chNum + 2 // Pages 3..14 (Chapter Dividers)
+                            let defaultTarget = chNum + 2 // Pages 3..14 (Chapter Dividers)
+                            let target: Int
+                            if let customLink = pageCustom?.linkOverrides[card.dest] {
+                                if !customLink.isEnabled { continue }
+                                target = customLink.targetPage
+                            } else {
+                                target = defaultTarget
+                            }
+                            
                             if target <= totalPages {
                                 writeContext.setDestination("page_\(target)" as CFString, for: card.rect)
                                 totalLinks += 1
@@ -471,7 +493,16 @@ public class AutonomousNotebookCompiler {
                     let chBasePage = noteSectionStarts[currentCh - 1]
                     let cards = comp.links.filter { $0.kind == .chapterCard }
                     for (idx, card) in cards.enumerated() {
-                        let target = chBasePage + idx // 12 subchapters within chapter (45..56 for ch1, etc.)
+                        let defaultTarget = chBasePage + idx // 12 subchapters within chapter (45..56 for ch1, etc.)
+                        let secId = "sec\(idx + 1)"
+                        let target: Int
+                        if let customLink = pageCustom?.linkOverrides[secId] {
+                            if !customLink.isEnabled { continue }
+                            target = customLink.targetPage
+                        } else {
+                            target = defaultTarget
+                        }
+                        
                         if target <= totalPages {
                             writeContext.setDestination("page_\(target)" as CFString, for: card.rect)
                             totalLinks += 1
@@ -494,7 +525,15 @@ public class AutonomousNotebookCompiler {
                 if p == 15 {
                     let tCards = comp.links.filter { $0.kind == .templateCard }
                     for (idx, card) in tCards.enumerated() {
-                        let target = 16 + idx
+                        let defaultTarget = 16 + idx
+                        let tId = "template_\(idx)"
+                        let target: Int
+                        if let customLink = pageCustom?.linkOverrides[tId] {
+                            if !customLink.isEnabled { continue }
+                            target = customLink.targetPage
+                        } else {
+                            target = defaultTarget
+                        }
                         if target <= totalPages {
                             writeContext.setDestination("page_\(target)" as CFString, for: card.rect)
                             totalLinks += 1

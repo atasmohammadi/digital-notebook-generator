@@ -2,6 +2,7 @@ import SwiftUI
 
 public enum NavigationTab: String, CaseIterable, Identifiable {
     case generator = "Generator"
+    case pageEditor = "Page Inspector & Editor"
     case templateStudio = "Template Studio (Zero Canva)"
     case aiChat = "AI Template Designer"
     case layout = "Layout & Sections"
@@ -13,6 +14,7 @@ public enum NavigationTab: String, CaseIterable, Identifiable {
     public var iconName: String {
         switch self {
         case .generator: return "wand.and.stars"
+        case .pageEditor: return "slider.horizontal.2.square.on.square"
         case .templateStudio: return "paintbrush.pointed.fill"
         case .aiChat: return "sparkles.bubble.fill"
         case .layout: return "rectangle.split.2x1"
@@ -105,6 +107,8 @@ public struct MainAppView: View {
                 switch selectedTab {
                 case .generator:
                     GeneratorView(config: $config)
+                case .pageEditor:
+                    PageEditorView(config: $config, presetManager: presetManager, themeManager: themeManager)
                 case .templateStudio:
                     TemplateStudioView(
                         themeManager: themeManager,

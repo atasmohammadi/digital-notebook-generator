@@ -727,6 +727,7 @@ public struct TemplateStudioView: View {
             watermarkSettings: notebookConfig.watermarkSettings,
             chapterNavSettings: notebookConfig.chapterNavSettings,
             templateMapping: notebookConfig.templateMapping,
+            pageOverrides: notebookConfig.pageOverrides,
             totalPages: 188,
             autoCompressPDF: notebookConfig.autoCompressPDF,
             targetMaxFileSizeMB: notebookConfig.targetMaxFileSizeMB

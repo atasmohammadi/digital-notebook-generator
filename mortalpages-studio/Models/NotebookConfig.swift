@@ -35,6 +35,9 @@ public struct NotebookConfig: Codable, Equatable {
     // Page & Section Template Mapping
     public var templateMapping: NotebookTemplateMapping
     
+    // Per-Page Visual Styles & Link Overrides
+    public var pageOverrides: [Int: PageConfigOverride]
+    
     // Output Compression & Quality Optimization
     public var autoCompressPDF: Bool
     public var targetMaxFileSizeMB: Double
@@ -91,6 +94,7 @@ public struct NotebookConfig: Codable, Equatable {
         chapterNavSettings: ChapterNavIndicatorSettings = .defaultSettings,
         watermarkSettings: WatermarkSettings = .defaultSettings,
         templateMapping: NotebookTemplateMapping = .defaultMapping,
+        pageOverrides: [Int: PageConfigOverride] = [:],
         autoCompressPDF: Bool = true,
         targetMaxFileSizeMB: Double = 5.0,
         strictSizeEnforcement: Bool = true,
@@ -117,6 +121,7 @@ public struct NotebookConfig: Codable, Equatable {
         self.chapterNavSettings = chapterNavSettings
         self.watermarkSettings = watermarkSettings
         self.templateMapping = templateMapping
+        self.pageOverrides = pageOverrides
         self.autoCompressPDF = autoCompressPDF
         self.targetMaxFileSizeMB = targetMaxFileSizeMB
         self.strictSizeEnforcement = strictSizeEnforcement
@@ -131,7 +136,7 @@ public struct NotebookConfig: Codable, Equatable {
         case sidebarWidth, skipSidebarStartPage, skipSidebarEndPage
         case hasChapterArrows, arrowTargets, useSidebarSizeForArrows, customArrowWidth, customArrowHeight
         case chapterNavSettings
-        case watermarkSettings, templateMapping
+        case watermarkSettings, templateMapping, pageOverrides
         case autoCompressPDF, targetMaxFileSizeMB, strictSizeEnforcement
         case stampWatermarkOnAllPages, watermarkX, watermarkY, watermarkWidth, watermarkHeight, neutralizeDataDetectors
         case generateInteractivePDF, syncKeynotePresentation
@@ -160,6 +165,7 @@ public struct NotebookConfig: Codable, Equatable {
         syncKeynotePresentation = try container.decode(Bool.self, forKey: .syncKeynotePresentation)
         
         self.templateMapping = (try? container.decode(NotebookTemplateMapping.self, forKey: .templateMapping)) ?? .defaultMapping
+        self.pageOverrides = (try? container.decode([Int: PageConfigOverride].self, forKey: .pageOverrides)) ?? [:]
         self.autoCompressPDF = (try? container.decode(Bool.self, forKey: .autoCompressPDF)) ?? true
         self.targetMaxFileSizeMB = (try? container.decode(Double.self, forKey: .targetMaxFileSizeMB)) ?? 5.0
         self.strictSizeEnforcement = (try? container.decode(Bool.self, forKey: .strictSizeEnforcement)) ?? true
@@ -225,6 +231,7 @@ public struct NotebookConfig: Codable, Equatable {
         
         try container.encode(watermarkSettings, forKey: .watermarkSettings)
         try container.encode(templateMapping, forKey: .templateMapping)
+        try container.encode(pageOverrides, forKey: .pageOverrides)
         try container.encode(autoCompressPDF, forKey: .autoCompressPDF)
         try container.encode(targetMaxFileSizeMB, forKey: .targetMaxFileSizeMB)
         try container.encode(strictSizeEnforcement, forKey: .strictSizeEnforcement)
@@ -263,6 +270,7 @@ public struct NotebookConfig: Codable, Equatable {
             chapterNavSettings: .defaultSettings,
             watermarkSettings: .defaultSettings,
             templateMapping: .defaultMapping,
+            pageOverrides: [:],
             autoCompressPDF: true,
             targetMaxFileSizeMB: 5.0,
             strictSizeEnforcement: true,
@@ -323,6 +331,7 @@ public struct NotebookConfig: Codable, Equatable {
                 neutralizeDataDetectors: true
             ),
             templateMapping: .defaultMapping,
+            pageOverrides: [:],
             autoCompressPDF: true,
             targetMaxFileSizeMB: 5.0,
             strictSizeEnforcement: true,

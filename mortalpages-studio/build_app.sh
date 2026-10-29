@@ -29,6 +29,7 @@ swiftc -O -parse-as-library \
     -framework WebKit \
     -framework Foundation \
     "${SCRIPT_DIR}/App/mortalpagesStudioApp.swift" \
+    "${SCRIPT_DIR}/Models/PageCustomization.swift" \
     "${SCRIPT_DIR}/Models/NotebookTemplateMapping.swift" \
     "${SCRIPT_DIR}/Models/ChapterNavIndicatorSettings.swift" \
     "${SCRIPT_DIR}/Models/NotebookConfig.swift" \
@@ -41,6 +42,7 @@ swiftc -O -parse-as-library \
     "${SCRIPT_DIR}/Engine/PDFLinkEngine.swift" \
     "${SCRIPT_DIR}/Engine/WatermarkRenderer.swift" \
     "${SCRIPT_DIR}/Engine/WebKitPreviewView.swift" \
+    "${SCRIPT_DIR}/Engine/PageHTMLCustomizer.swift" \
     "${SCRIPT_DIR}/Engine/AutonomousNotebookCompiler.swift" \
     "${SCRIPT_DIR}/Engine/TemplateRegistry.swift" \
     "${SCRIPT_DIR}/Engine/AIAgentBridge.swift" \
@@ -52,6 +54,7 @@ swiftc -O -parse-as-library \
     "${SCRIPT_DIR}/Views/Components/IDECodeEditor.swift" \
     "${SCRIPT_DIR}/Views/Components/GuideCallout.swift" \
     "${SCRIPT_DIR}/Views/GeneratorView.swift" \
+    "${SCRIPT_DIR}/Views/PageEditorView.swift" \
     "${SCRIPT_DIR}/Views/LayoutConfigView.swift" \
     "${SCRIPT_DIR}/Views/WatermarkConfigView.swift" \
     "${SCRIPT_DIR}/Views/ThemePresetsView.swift" \
