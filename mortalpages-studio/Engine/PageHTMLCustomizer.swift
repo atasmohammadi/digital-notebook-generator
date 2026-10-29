@@ -166,4 +166,76 @@ public class PageHTMLCustomizer {
         }
         return injectedCSS + result
     }
+    
+    /// Loads the HTML template file for a given page, handles subchapter placeholder substitutions,
+    /// and highlights active sidebar tabs dynamically.
+    public static func loadAndPrepareHTML(
+        forPage p: Int,
+        templateMapping: NotebookTemplateMapping,
+        templateDir: URL
+    ) -> String {
+        let noteSectionStarts = [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177]
+        let relPath = templateMapping.resolveTemplate(forPage: p, arrowTargets: noteSectionStarts)
+        var fileURL = templateDir.appendingPathComponent(relPath)
+        
+        var currentCh = 0
+        if relPath.hasPrefix("Navigation/subchapter_selection_") {
+            let stem = relPath.replacingOccurrences(of: "Navigation/subchapter_selection_", with: "").replacingOccurrences(of: ".html", with: "")
+            currentCh = Int(stem) ?? 1
+            fileURL = templateDir.appendingPathComponent("Navigation/subchapter_selection.html")
+        }
+        
+        guard var html = try? String(contentsOf: fileURL, encoding: .utf8), !html.isEmpty else {
+            return "<div style='padding:40px;color:red;'>Template file not found at \(fileURL.path)</div>"
+        }
+        
+        // Active destination for sidebar highlighting
+        let activeDest: String
+        if p == 1 {
+            activeDest = ""
+        } else if p == 2 {
+            activeDest = "home"
+        } else if p >= 3 && p <= 14 {
+            activeDest = "ch\(p - 2)"
+        } else if p >= 15 && p <= 44 {
+            activeDest = "templates"
+        } else {
+            let chNum = min(12, max(1, ((p - 45) / 12) + 1))
+            activeDest = "ch\(chNum)"
+        }
+        
+        // If subchapter selection, substitute placeholders
+        if currentCh > 0 {
+            let chWords = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"]
+            let word = (currentCh >= 1 && currentCh <= 12) ? chWords[currentCh - 1] : "\(currentCh)"
+            html = html.replacingOccurrences(of: "{{CHAPTER_NUM}}", with: "\(currentCh)")
+            html = html.replacingOccurrences(of: "{{CHAPTER_WORD}}", with: word)
+            
+            var cardsHTML = ""
+            for k in 1...12 {
+                cardsHTML += """
+                <div class="chapter-card" data-dest="sec\(k)">
+                  <div class="chapter-info"><div class="chapter-number">\(currentCh).\(k)</div><span class="chapter-name">Section \(k)</span></div>
+                  <svg class="chapter-arrow" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg>
+                </div>\n
+                """
+            }
+            html = html.replacingOccurrences(of: "{{SUBCHAPTER_CARDS}}", with: cardsHTML)
+        }
+        
+        // Highlight active sidebar tab
+        html = html.replacingOccurrences(of: "tab active", with: "tab")
+        if !activeDest.isEmpty {
+            html = html.replacingOccurrences(of: "class=\"tab\" data-dest=\"\(activeDest)\"", with: "class=\"tab active\" data-dest=\"\(activeDest)\"")
+            html = html.replacingOccurrences(of: "data-dest=\"\(activeDest)\" class=\"tab\"", with: "data-dest=\"\(activeDest)\" class=\"tab active\"")
+            html = html.replacingOccurrences(of: "{{ACTIVE_\(activeDest.uppercased())}}", with: "active")
+        }
+        // Clear remaining {{ACTIVE_...}} tokens
+        let tokenRegex = try? NSRegularExpression(pattern: "\\{\\{ACTIVE_[A-Z0-9_]+\\}\\}", options: [])
+        if let regex = tokenRegex {
+            html = regex.stringByReplacingMatches(in: html, options: [], range: NSRange(location: 0, length: html.utf16.count), withTemplate: "")
+        }
+        
+        return html
+    }
 }

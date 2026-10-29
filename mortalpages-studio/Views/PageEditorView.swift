@@ -1185,14 +1185,11 @@ public struct PageEditorView: View {
     }
     
     private func refreshRenderedHTML() {
-        let noteSectionStarts = [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177]
-        let relPath = config.templateMapping.resolveTemplate(forPage: currentPage, arrowTargets: noteSectionStarts)
-        let fileURL = templateBaseDir.appendingPathComponent(relPath)
-        
-        guard let baseHTML = try? String(contentsOf: fileURL, encoding: .utf8) else {
-            renderedHTML = "<div style='padding:40px;color:red;'>Template not found: \(relPath)</div>"
-            return
-        }
+        let baseHTML = PageHTMLCustomizer.loadAndPrepareHTML(
+            forPage: currentPage,
+            templateMapping: config.templateMapping,
+            templateDir: templateBaseDir
+        )
         
         let override = config.pageOverrides[currentPage] ?? PageConfigOverride.defaultForPage(currentPage)
         let customized = PageHTMLCustomizer.customize(html: baseHTML, with: override)
