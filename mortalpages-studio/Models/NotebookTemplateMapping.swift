@@ -150,7 +150,8 @@ public struct NotebookTemplateMapping: Codable, Equatable {
         }
         
         // 7. Subchapter Cover Headers (Pages 45, 57, 69...)
-        if arrowTargets.contains(p) {
+        let noteSectionStarts = [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177]
+        if noteSectionStarts.contains(p) {
             return subchapterCoverTemplate
         }
         

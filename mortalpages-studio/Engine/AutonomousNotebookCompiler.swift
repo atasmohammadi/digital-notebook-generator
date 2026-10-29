@@ -372,8 +372,8 @@ public class AutonomousNotebookCompiler {
         var totalLinks = 0
         let totalPages = options.totalPages
         
-        // Chapter arrow targets: Subchapter covers on Pages 45, 57, 69, ...
-        let arrowTargets = [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177]
+        // Chapter note section start pages: Pages 45, 57, 69, ...
+        let noteSectionStarts = [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177]
         
         // Cache master sidebar tabs extracted from chapter_selection or full_grid
         var masterTabs: [ParsedHTMLLink] = []
@@ -402,7 +402,7 @@ public class AutonomousNotebookCompiler {
             }
             
             // Resolve template for page dynamically
-            let templateRelPath = options.templateMapping.resolveTemplate(forPage: p, arrowTargets: arrowTargets)
+            let templateRelPath = options.templateMapping.resolveTemplate(forPage: p, arrowTargets: noteSectionStarts)
             if let comp = getRenderedComponent(templateRelPath, activeDest) {
                 writeContext.drawPDFPage(comp.pdfPage)
                 
@@ -438,13 +438,13 @@ public class AutonomousNotebookCompiler {
                     }
                 }
                 
-                // Page 2: Chapter Selection Cards (Jump to Subchapter Sections 45, 57, 69...)
+                // Page 2: Chapter Selection Cards (12 boxes in contents -> Chapter Dividers Pages 3..14)
                 if p == 2 {
                     let cards = comp.links.filter { $0.kind == .chapterCard }
                     for card in cards {
                         let chNum = Int(card.dest.dropFirst(2)) ?? (card.index + 1)
-                        if chNum >= 1 && chNum <= arrowTargets.count {
-                            let target = arrowTargets[chNum - 1]
+                        if chNum >= 1 && chNum <= 12 {
+                            let target = chNum + 2 // Pages 3..14 (Chapter Dividers)
                             if target <= totalPages {
                                 writeContext.setDestination("page_\(target)" as CFString, for: card.rect)
                                 totalLinks += 1
@@ -457,6 +457,8 @@ public class AutonomousNotebookCompiler {
                                     let arrowY = card.rect.midY - arrowH / 2.0
                                     let arrowRect = CGRect(x: arrowX, y: arrowY, width: arrowW, height: arrowH)
                                     PDFLinkEngine.drawChapterIndicator(on: writeContext, in: arrowRect, settings: options.chapterNavSettings)
+                                    writeContext.setDestination("page_\(target)" as CFString, for: arrowRect)
+                                    totalLinks += 1
                                 }
                             }
                         }
@@ -466,10 +468,10 @@ public class AutonomousNotebookCompiler {
                 // Pages 3..14: Subchapter Selection Cards (Chapter Divider Pages)
                 if p >= 3 && p <= 14 {
                     let currentCh = p - 2 // 1..12
-                    let chBasePage = arrowTargets[currentCh - 1]
+                    let chBasePage = noteSectionStarts[currentCh - 1]
                     let cards = comp.links.filter { $0.kind == .chapterCard }
                     for (idx, card) in cards.enumerated() {
-                        let target = chBasePage + idx // 12 subchapters within chapter
+                        let target = chBasePage + idx // 12 subchapters within chapter (45..56 for ch1, etc.)
                         if target <= totalPages {
                             writeContext.setDestination("page_\(target)" as CFString, for: card.rect)
                             totalLinks += 1
@@ -481,6 +483,8 @@ public class AutonomousNotebookCompiler {
                                 let arrowY = card.rect.midY - arrowH / 2.0
                                 let arrowRect = CGRect(x: arrowX, y: arrowY, width: arrowW, height: arrowH)
                                 PDFLinkEngine.drawChapterIndicator(on: writeContext, in: arrowRect, settings: options.chapterNavSettings)
+                                writeContext.setDestination("page_\(target)" as CFString, for: arrowRect)
+                                totalLinks += 1
                             }
                         }
                     }

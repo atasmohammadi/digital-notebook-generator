@@ -21,7 +21,7 @@ public struct NotebookConfig: Codable, Equatable {
     
     // Chapter Selection Arrows on Page 2
     public var hasChapterArrows: Bool
-    public var arrowTargets: [Int] // Chapters 1..12 targets: 45, 57, 69, ...
+    public var arrowTargets: [Int] // Chapters 1..12 targets: 3, 4, 5, ... (or custom targets)
     public var useSidebarSizeForArrows: Bool
     public var customArrowWidth: CGFloat
     public var customArrowHeight: CGFloat
@@ -256,7 +256,7 @@ public struct NotebookConfig: Codable, Equatable {
             skipSidebarStartPage: 3,
             skipSidebarEndPage: 14,
             hasChapterArrows: true,
-            arrowTargets: [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177],
+            arrowTargets: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
             useSidebarSizeForArrows: true,
             customArrowWidth: 42.22,
             customArrowHeight: 101.51,
@@ -286,7 +286,7 @@ public struct NotebookConfig: Codable, Equatable {
             skipSidebarStartPage: 3,
             skipSidebarEndPage: 14,
             hasChapterArrows: true,
-            arrowTargets: [45, 57, 69, 81, 93, 105, 117, 129, 141, 153, 165, 177],
+            arrowTargets: [3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
             useSidebarSizeForArrows: true,
             customArrowWidth: 42.22,
             customArrowHeight: 101.51,
