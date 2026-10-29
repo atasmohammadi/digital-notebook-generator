@@ -7,12 +7,20 @@ public struct WebKitPreviewView: NSViewRepresentable {
     public let baseURL: URL?
     public let customVariables: [String: String]
     public let zoomFactor: Double
+    public let pageKey: String
     
-    public init(htmlContent: String, baseURL: URL? = nil, customVariables: [String: String] = [:], zoomFactor: Double = 0.5) {
+    public init(
+        htmlContent: String,
+        baseURL: URL? = nil,
+        customVariables: [String: String] = [:],
+        zoomFactor: Double = 0.5,
+        pageKey: String = ""
+    ) {
         self.htmlContent = htmlContent
         self.baseURL = baseURL
         self.customVariables = customVariables
         self.zoomFactor = zoomFactor
+        self.pageKey = pageKey
     }
     
     public func makeNSView(context: Context) -> WKWebView {
@@ -23,8 +31,10 @@ public struct WebKitPreviewView: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground") // Transparent background
         webView.pageZoom = zoomFactor
         
+        context.coordinator.lastPageKey = pageKey
         context.coordinator.lastHTML = htmlContent
         context.coordinator.lastVariables = customVariables
+        context.coordinator.isLoaded = true
         loadContent(in: webView)
         return webView
     }
@@ -32,13 +42,20 @@ public struct WebKitPreviewView: NSViewRepresentable {
     public func updateNSView(_ webView: WKWebView, context: Context) {
         webView.pageZoom = zoomFactor
         
+        let pageKeyChanged = !pageKey.isEmpty && context.coordinator.lastPageKey != pageKey
         let htmlChanged = context.coordinator.lastHTML != htmlContent
         let varsChanged = context.coordinator.lastVariables != customVariables
         
-        if htmlChanged {
+        if pageKeyChanged || !context.coordinator.isLoaded {
+            context.coordinator.lastPageKey = pageKey
             context.coordinator.lastHTML = htmlContent
             context.coordinator.lastVariables = customVariables
+            context.coordinator.isLoaded = true
             loadContent(in: webView)
+        } else if htmlChanged {
+            context.coordinator.lastHTML = htmlContent
+            context.coordinator.lastVariables = customVariables
+            applyFastDOMUpdate(in: webView)
         } else if varsChanged {
             context.coordinator.lastVariables = customVariables
             applyCSSVariablesLive(in: webView)
@@ -50,8 +67,77 @@ public struct WebKitPreviewView: NSViewRepresentable {
     }
     
     public class Coordinator: NSObject {
+        var lastPageKey: String = ""
         var lastHTML: String = ""
         var lastVariables: [String: String] = [:]
+        var isLoaded: Bool = false
+    }
+    
+    private func applyFastDOMUpdate(in webView: WKWebView) {
+        // Extract <style id="page-customizer-overrides">...</style> if present
+        var styleCSS = ""
+        if let startRange = htmlContent.range(of: "<style id=\"page-customizer-overrides\">"),
+           let endRange = htmlContent.range(of: "</style>", range: startRange.upperBound..<htmlContent.endIndex) {
+            styleCSS = String(htmlContent[startRange.upperBound..<endRange.lowerBound])
+        }
+        
+        let title = extractTagText(from: htmlContent, tagClass: "page-title")
+        let subtitle = extractTagText(from: htmlContent, tagClass: "page-subtitle")
+        let plaque = extractTagText(from: htmlContent, tagClass: "watermark-plaque")
+        
+        let escapedCSS = styleCSS
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\n", with: "\\n")
+        
+        var js = "(function() {\n"
+        if !styleCSS.isEmpty {
+            js += """
+            var st = document.getElementById('page-customizer-overrides');
+            if (st) {
+                st.textContent = '\(escapedCSS)';
+            } else {
+                st = document.createElement('style');
+                st.id = 'page-customizer-overrides';
+                st.textContent = '\(escapedCSS)';
+                document.head.appendChild(st);
+            }
+            """
+        }
+        
+        if let t = title {
+            let escT = t.replacingOccurrences(of: "'", with: "\\'")
+            js += "\nvar pt = document.querySelector('.page-title'); if (pt) pt.textContent = '\(escT)';"
+        }
+        if let s = subtitle {
+            let escS = s.replacingOccurrences(of: "'", with: "\\'")
+            js += "\nvar ps = document.querySelector('.page-subtitle'); if (ps) ps.textContent = '\(escS)';"
+        }
+        if let p = plaque {
+            let escP = p.replacingOccurrences(of: "'", with: "\\'")
+            js += "\nvar wp = document.querySelector('.watermark-plaque'); if (wp) wp.textContent = '\(escP)';"
+        }
+        
+        js += "\n})();"
+        
+        webView.evaluateJavaScript(js) { _, error in
+            if error != nil {
+                self.loadContent(in: webView)
+            }
+        }
+    }
+    
+    private func extractTagText(from html: String, tagClass: String) -> String? {
+        let pattern = "<[^>]*class=\"[^\"]*\(tagClass)[^\"]*\"[^>]*>([^<]*)</[^>]*>"
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return nil }
+        let range = NSRange(location: 0, length: html.utf16.count)
+        if let match = regex.firstMatch(in: html, options: [], range: range), match.numberOfRanges > 1 {
+            let captureRange = match.range(at: 1)
+            if let swiftRange = Range(captureRange, in: html) {
+                return String(html[swiftRange])
+            }
+        }
+        return nil
     }
     
     private func loadContent(in webView: WKWebView) {

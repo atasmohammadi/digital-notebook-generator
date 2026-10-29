@@ -59,17 +59,39 @@ public struct PageEditorView: View {
         self._pageInputString = State(initialValue: "\(initialPage)")
     }
     
-    // Binding to active page configuration override
-    private var activeOverrideBinding: Binding<PageConfigOverride> {
+    // Direct reactive keypath binding to current page override
+    private func binding<T>(_ keyPath: WritableKeyPath<PageConfigOverride, T>) -> Binding<T> {
         Binding(
             get: {
-                if let existing = config.pageOverrides[currentPage] {
-                    return existing
+                if let o = config.pageOverrides[currentPage] {
+                    return o[keyPath: keyPath]
                 }
-                return PageConfigOverride.defaultForPage(currentPage)
+                return PageConfigOverride.defaultForPage(currentPage)[keyPath: keyPath]
+            },
+            set: { newVal in
+                if config.pageOverrides[currentPage] == nil {
+                    config.pageOverrides[currentPage] = PageConfigOverride.defaultForPage(currentPage)
+                }
+                config.pageOverrides[currentPage]![keyPath: keyPath] = newVal
+                refreshRenderedHTML()
+            }
+        )
+    }
+    
+    private func linkBinding(for linkId: String) -> Binding<PageLinkOverride> {
+        Binding(
+            get: {
+                if let o = config.pageOverrides[currentPage]?.linkOverrides[linkId] {
+                    return o
+                }
+                let def = PageConfigOverride.defaultForPage(currentPage).linkOverrides[linkId] ?? PageLinkOverride(id: linkId, name: linkId, targetPage: 2)
+                return def
             },
             set: { updated in
-                config.pageOverrides[currentPage] = updated
+                if config.pageOverrides[currentPage] == nil {
+                    config.pageOverrides[currentPage] = PageConfigOverride.defaultForPage(currentPage)
+                }
+                config.pageOverrides[currentPage]!.linkOverrides[linkId] = updated
                 refreshRenderedHTML()
             }
         )
@@ -111,10 +133,12 @@ public struct PageEditorView: View {
             saveAsPresetSheet
         }
         .onAppear {
+            ensureCurrentPageInitialized()
             refreshRenderedHTML()
         }
         .onChange(of: currentPage) { newP in
             pageInputString = "\(newP)"
+            ensureCurrentPageInitialized()
             refreshRenderedHTML()
         }
         .onChange(of: themeManager.activeTheme.id) { _ in
@@ -333,7 +357,7 @@ public struct PageEditorView: View {
             
             Divider()
             
-            // WebKit Preview
+            // WebKit Preview with Live Instant DOM Updates
             ZStack {
                 Color(NSColor.underPageBackgroundColor)
                 
@@ -344,7 +368,8 @@ public struct PageEditorView: View {
                         htmlContent: renderedHTML,
                         baseURL: templateBaseDir,
                         customVariables: themeManager.activeTheme.variables,
-                        zoomFactor: previewZoom
+                        zoomFactor: previewZoom,
+                        pageKey: "page_\(currentPage)"
                     )
                 }
             }
@@ -384,19 +409,19 @@ public struct PageEditorView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     switch selectedTab {
                     case .links:
-                        hyperlinksInspector(override: activeOverrideBinding)
+                        hyperlinksInspector()
                     case .header:
-                        headerInspector(override: activeOverrideBinding)
+                        headerInspector()
                     case .sidebar:
-                        sidebarInspector(override: activeOverrideBinding)
+                        sidebarInspector()
                     case .content:
-                        contentCanvasInspector(override: activeOverrideBinding)
+                        contentCanvasInspector()
                     case .cards:
-                        cardsInspector(override: activeOverrideBinding)
+                        cardsInspector()
                     case .footer:
-                        footerInspector(override: activeOverrideBinding)
+                        footerInspector()
                     case .customCSS:
-                        customCSSInspector(override: activeOverrideBinding)
+                        customCSSInspector()
                     }
                 }
                 .padding(16)
@@ -406,7 +431,7 @@ public struct PageEditorView: View {
     }
     
     // MARK: - Tab 1: Hyperlinks & Destinations Inspector
-    private func hyperlinksInspector(override: Binding<PageConfigOverride>) -> some View {
+    private func hyperlinksInspector() -> some View {
         VStack(alignment: .leading, spacing: 14) {
             GuideCallout(
                 title: "PER-PAGE HYPERLINK MANAGER",
@@ -437,7 +462,7 @@ public struct PageEditorView: View {
                 .controlSize(.small)
             }
             
-            let linksDict = override.wrappedValue.linkOverrides
+            let linksDict = (config.pageOverrides[currentPage] ?? PageConfigOverride.defaultForPage(currentPage)).linkOverrides
             let sortedKeys = linksDict.keys.sorted { k1, k2 in
                 let l1 = linksDict[k1]!
                 let l2 = linksDict[k2]!
@@ -473,23 +498,21 @@ public struct PageEditorView: View {
                 .background(RoundedRectangle(cornerRadius: 10).fill(Color(NSColor.controlBackgroundColor)))
             } else {
                 ForEach(filteredKeys, id: \.self) { linkId in
-                    linkRowCard(linkId: linkId, override: override)
+                    linkRowCard(linkId: linkId)
                 }
             }
         }
     }
     
-    private func linkRowCard(linkId: String, override: Binding<PageConfigOverride>) -> some View {
-        let link = override.wrappedValue.linkOverrides[linkId] ?? PageLinkOverride(id: linkId, name: linkId, targetPage: 2)
+    private func linkRowCard(linkId: String) -> some View {
+        let b = linkBinding(for: linkId)
+        let link = b.wrappedValue
         
         return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Toggle(isOn: Binding(
-                    get: { override.wrappedValue.linkOverrides[linkId]?.isEnabled ?? true },
-                    set: {
-                        override.wrappedValue.linkOverrides[linkId]?.isEnabled = $0
-                        refreshRenderedHTML()
-                    }
+                    get: { b.wrappedValue.isEnabled },
+                    set: { b.wrappedValue.isEnabled = $0 }
                 )) {
                     Text(link.name)
                         .fontWeight(.semibold)
@@ -517,26 +540,20 @@ public struct PageEditorView: View {
                     HStack(spacing: 8) {
                         Stepper(
                             value: Binding(
-                                get: { override.wrappedValue.linkOverrides[linkId]?.targetPage ?? 2 },
-                                set: {
-                                    override.wrappedValue.linkOverrides[linkId]?.targetPage = max(1, min(188, $0))
-                                    refreshRenderedHTML()
-                                }
+                                get: { b.wrappedValue.targetPage },
+                                set: { b.wrappedValue.targetPage = max(1, min(188, $0)) }
                             ),
                             in: 1...188
                         ) {
-                            Text("Page \(override.wrappedValue.linkOverrides[linkId]?.targetPage ?? 2)")
+                            Text("Page \(b.wrappedValue.targetPage)")
                                 .font(.system(size: 13, weight: .bold, design: .monospaced))
                                 .frame(width: 70, alignment: .leading)
                         }
                         
                         // Destination Page Dropdown Quick Jumper
                         Picker("", selection: Binding(
-                            get: { override.wrappedValue.linkOverrides[linkId]?.targetPage ?? 2 },
-                            set: {
-                                override.wrappedValue.linkOverrides[linkId]?.targetPage = $0
-                                refreshRenderedHTML()
-                            }
+                            get: { b.wrappedValue.targetPage },
+                            set: { b.wrappedValue.targetPage = $0 }
                         )) {
                             Text("P1: Cover").tag(1)
                             Text("P2: Chapter Selection").tag(2)
@@ -556,9 +573,7 @@ public struct PageEditorView: View {
                         
                         // Jump & Test Button
                         Button(action: {
-                            if let target = override.wrappedValue.linkOverrides[linkId]?.targetPage {
-                                changePage(to: target)
-                            }
+                            changePage(to: b.wrappedValue.targetPage)
                         }) {
                             Image(systemName: "arrow.up.right.square")
                         }
@@ -577,11 +592,8 @@ public struct PageEditorView: View {
                         .frame(width: 44, alignment: .leading)
                     
                     TextField("Card display name (e.g. Chapter One)", text: Binding(
-                        get: { override.wrappedValue.linkOverrides[linkId]?.customLabel ?? "" },
-                        set: {
-                            override.wrappedValue.linkOverrides[linkId]?.customLabel = $0
-                            refreshRenderedHTML()
-                        }
+                        get: { b.wrappedValue.customLabel },
+                        set: { b.wrappedValue.customLabel = $0 }
                     ))
                     .textFieldStyle(.roundedBorder)
                     .font(.caption)
@@ -594,8 +606,10 @@ public struct PageEditorView: View {
     }
     
     // MARK: - Tab 2: Header & Typography Inspector
-    private func headerInspector(override: Binding<PageConfigOverride>) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+    private func headerInspector() -> some View {
+        let isVisible = (config.pageOverrides[currentPage] ?? PageConfigOverride.defaultForPage(currentPage)).headerStyle.isVisible
+        
+        return VStack(alignment: .leading, spacing: 16) {
             GuideCallout(
                 title: "HEADER & TYPOGRAPHY CONTROLS",
                 whatItDoes: "Customizes the page title, subtitle, font family, typography size, weight, alignment, and spacing for Page \(currentPage).",
@@ -605,10 +619,10 @@ public struct PageEditorView: View {
                 tintColor: .purple
             )
             
-            Toggle("Show Header Section", isOn: override.headerStyle.isVisible)
+            Toggle("Show Header Section", isOn: binding(\.headerStyle.isVisible))
                 .font(.headline)
             
-            if override.wrappedValue.headerStyle.isVisible {
+            if isVisible {
                 Group {
                     Text("TEXT & CONTENT")
                         .font(.caption)
@@ -619,7 +633,7 @@ public struct PageEditorView: View {
                         Text("Page Title Text")
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                        TextField("Title text", text: override.headerStyle.text)
+                        TextField("Title text", text: binding(\.headerStyle.text))
                             .textFieldStyle(.roundedBorder)
                     }
                     
@@ -627,7 +641,7 @@ public struct PageEditorView: View {
                         Text("Page Subtitle Text")
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                        TextField("Subtitle text", text: override.headerStyle.subtitle)
+                        TextField("Subtitle text", text: binding(\.headerStyle.subtitle))
                             .textFieldStyle(.roundedBorder)
                     }
                 }
@@ -645,7 +659,7 @@ public struct PageEditorView: View {
                             Text("Font Family")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Picker("", selection: override.headerStyle.fontFamily) {
+                            Picker("", selection: binding(\.headerStyle.fontFamily)) {
                                 Text("Playfair Display (Serif)").tag("Playfair Display")
                                 Text("Inter (Modern Sans)").tag("Inter")
                                 Text("Georgia (Classic)").tag("Georgia")
@@ -660,7 +674,7 @@ public struct PageEditorView: View {
                             Text("Weight")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Picker("", selection: override.headerStyle.fontWeight) {
+                            Picker("", selection: binding(\.headerStyle.fontWeight)) {
                                 Text("400 Regular").tag("400")
                                 Text("500 Medium").tag("500")
                                 Text("600 SemiBold").tag("600")
@@ -674,7 +688,7 @@ public struct PageEditorView: View {
                     // Title Font Size
                     sliderControl(
                         title: "Title Font Size",
-                        value: override.headerStyle.fontSize,
+                        value: binding(\.headerStyle.fontSize),
                         range: 12...72,
                         unit: "px"
                     )
@@ -682,7 +696,7 @@ public struct PageEditorView: View {
                     // Subtitle Font Size
                     sliderControl(
                         title: "Subtitle Font Size",
-                        value: override.headerStyle.subtitleFontSize,
+                        value: binding(\.headerStyle.subtitleFontSize),
                         range: 8...36,
                         unit: "px"
                     )
@@ -690,7 +704,7 @@ public struct PageEditorView: View {
                     // Letter Spacing
                     sliderControl(
                         title: "Letter Spacing",
-                        value: override.headerStyle.letterSpacing,
+                        value: binding(\.headerStyle.letterSpacing),
                         range: -1...10,
                         unit: "px"
                     )
@@ -701,7 +715,7 @@ public struct PageEditorView: View {
                             Text("Alignment")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Picker("", selection: override.headerStyle.alignment) {
+                            Picker("", selection: binding(\.headerStyle.alignment)) {
                                 Text("Left").tag("left")
                                 Text("Center").tag("center")
                                 Text("Right").tag("right")
@@ -713,7 +727,7 @@ public struct PageEditorView: View {
                             Text("Transform")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Picker("", selection: override.headerStyle.textTransform) {
+                            Picker("", selection: binding(\.headerStyle.textTransform)) {
                                 Text("None").tag("none")
                                 Text("UPPERCASE").tag("uppercase")
                                 Text("Capitalize").tag("capitalize")
@@ -726,12 +740,12 @@ public struct PageEditorView: View {
                     HStack(spacing: 16) {
                         colorPickerWithHex(
                             title: "Title Color",
-                            hex: override.headerStyle.textColorHex
+                            hex: binding(\.headerStyle.textColorHex)
                         )
                         
                         colorPickerWithHex(
                             title: "Subtitle Color",
-                            hex: override.headerStyle.subtitleColorHex
+                            hex: binding(\.headerStyle.subtitleColorHex)
                         )
                     }
                 }
@@ -744,10 +758,10 @@ public struct PageEditorView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.secondary)
                     
-                    sliderControl(title: "Padding Top", value: override.headerStyle.paddingTop, range: 0...100, unit: "px")
-                    sliderControl(title: "Padding Bottom", value: override.headerStyle.paddingBottom, range: 0...100, unit: "px")
-                    sliderControl(title: "Margin Bottom", value: override.headerStyle.marginBottom, range: 0...100, unit: "px")
-                    sliderControl(title: "Title-Subtitle Gap", value: override.headerStyle.spacing, range: 0...50, unit: "px")
+                    sliderControl(title: "Padding Top", value: binding(\.headerStyle.paddingTop), range: 0...100, unit: "px")
+                    sliderControl(title: "Padding Bottom", value: binding(\.headerStyle.paddingBottom), range: 0...100, unit: "px")
+                    sliderControl(title: "Margin Bottom", value: binding(\.headerStyle.marginBottom), range: 0...100, unit: "px")
+                    sliderControl(title: "Title-Subtitle Gap", value: binding(\.headerStyle.spacing), range: 0...50, unit: "px")
                 }
                 
                 Divider()
@@ -761,8 +775,10 @@ public struct PageEditorView: View {
     }
     
     // MARK: - Tab 3: Sidebar Navigation Inspector
-    private func sidebarInspector(override: Binding<PageConfigOverride>) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+    private func sidebarInspector() -> some View {
+        let isVisible = (config.pageOverrides[currentPage] ?? PageConfigOverride.defaultForPage(currentPage)).sidebarStyle.isVisible
+        
+        return VStack(alignment: .leading, spacing: 16) {
             GuideCallout(
                 title: "SIDEBAR NAVIGATION TABS",
                 whatItDoes: "Configures the vertical navigation tabs on the left edge of the page: width, tab height, corner radius, background, active accent color, and text styling.",
@@ -772,21 +788,21 @@ public struct PageEditorView: View {
                 tintColor: .blue
             )
             
-            Toggle("Show Sidebar Navigation on Page \(currentPage)", isOn: override.sidebarStyle.isVisible)
+            Toggle("Show Sidebar Navigation on Page \(currentPage)", isOn: binding(\.sidebarStyle.isVisible))
                 .font(.headline)
             
-            if override.wrappedValue.sidebarStyle.isVisible {
+            if isVisible {
                 Group {
                     Text("DIMENSIONS & GEOMETRY")
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundColor(.secondary)
                     
-                    sliderControl(title: "Sidebar Width", value: override.sidebarStyle.paddingRight, range: 30...120, unit: "px")
-                    sliderControl(title: "Tab Height", value: override.sidebarStyle.paddingBottom, range: 30...120, unit: "px")
-                    sliderControl(title: "Tab Gap / Spacing", value: override.sidebarStyle.spacing, range: 0...30, unit: "px")
-                    sliderControl(title: "Tab Corner Radius", value: override.sidebarStyle.cornerRadius, range: 0...24, unit: "px")
-                    sliderControl(title: "Tab Font Size", value: override.sidebarStyle.fontSize, range: 8...22, unit: "px")
+                    sliderControl(title: "Sidebar Width", value: binding(\.sidebarStyle.paddingRight), range: 30...120, unit: "px")
+                    sliderControl(title: "Tab Height", value: binding(\.sidebarStyle.paddingBottom), range: 30...120, unit: "px")
+                    sliderControl(title: "Tab Gap / Spacing", value: binding(\.sidebarStyle.spacing), range: 0...30, unit: "px")
+                    sliderControl(title: "Tab Corner Radius", value: binding(\.sidebarStyle.cornerRadius), range: 0...24, unit: "px")
+                    sliderControl(title: "Tab Font Size", value: binding(\.sidebarStyle.fontSize), range: 8...22, unit: "px")
                 }
                 
                 Divider()
@@ -798,16 +814,16 @@ public struct PageEditorView: View {
                         .foregroundColor(.secondary)
                     
                     HStack(spacing: 16) {
-                        colorPickerWithHex(title: "Tab Background", hex: override.sidebarStyle.bgColorHex)
-                        colorPickerWithHex(title: "Active Tab Accent", hex: override.sidebarStyle.subtitleColorHex)
+                        colorPickerWithHex(title: "Tab Background", hex: binding(\.sidebarStyle.bgColorHex))
+                        colorPickerWithHex(title: "Active Tab Accent", hex: binding(\.sidebarStyle.subtitleColorHex))
                     }
                     
                     HStack(spacing: 16) {
-                        colorPickerWithHex(title: "Tab Text Color", hex: override.sidebarStyle.textColorHex)
-                        colorPickerWithHex(title: "Border Color", hex: override.sidebarStyle.borderColorHex)
+                        colorPickerWithHex(title: "Tab Text Color", hex: binding(\.sidebarStyle.textColorHex))
+                        colorPickerWithHex(title: "Border Color", hex: binding(\.sidebarStyle.borderColorHex))
                     }
                     
-                    sliderControl(title: "Tab Shadow Opacity", value: override.sidebarStyle.shadowOpacity, range: 0...0.5, unit: "")
+                    sliderControl(title: "Tab Shadow Opacity", value: binding(\.sidebarStyle.shadowOpacity), range: 0...0.5, unit: "")
                 }
                 
                 Divider()
@@ -821,7 +837,7 @@ public struct PageEditorView: View {
     }
     
     // MARK: - Tab 4: Content Canvas & Spacing Inspector
-    private func contentCanvasInspector(override: Binding<PageConfigOverride>) -> some View {
+    private func contentCanvasInspector() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             GuideCallout(
                 title: "CANVAS & PAGE MARGINS",
@@ -838,10 +854,10 @@ public struct PageEditorView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.secondary)
                 
-                sliderControl(title: "Padding Top", value: override.contentStyle.paddingTop, range: 0...120, unit: "px")
-                sliderControl(title: "Padding Bottom", value: override.contentStyle.paddingBottom, range: 0...120, unit: "px")
-                sliderControl(title: "Padding Left", value: override.contentStyle.paddingLeft, range: 0...120, unit: "px")
-                sliderControl(title: "Padding Right", value: override.contentStyle.paddingRight, range: 0...120, unit: "px")
+                sliderControl(title: "Padding Top", value: binding(\.contentStyle.paddingTop), range: 0...120, unit: "px")
+                sliderControl(title: "Padding Bottom", value: binding(\.contentStyle.paddingBottom), range: 0...120, unit: "px")
+                sliderControl(title: "Padding Left", value: binding(\.contentStyle.paddingLeft), range: 0...120, unit: "px")
+                sliderControl(title: "Padding Right", value: binding(\.contentStyle.paddingRight), range: 0...120, unit: "px")
             }
             
             Divider()
@@ -853,20 +869,20 @@ public struct PageEditorView: View {
                     .foregroundColor(.secondary)
                 
                 HStack(spacing: 16) {
-                    colorPickerWithHex(title: "Page Background", hex: override.contentStyle.bgColorHex)
-                    colorPickerWithHex(title: "Border Color", hex: override.contentStyle.borderColorHex)
+                    colorPickerWithHex(title: "Page Background", hex: binding(\.contentStyle.bgColorHex))
+                    colorPickerWithHex(title: "Border Color", hex: binding(\.contentStyle.borderColorHex))
                 }
                 
-                sliderControl(title: "Border Width", value: override.contentStyle.borderWidth, range: 0...10, unit: "px")
-                sliderControl(title: "Corner Radius", value: override.contentStyle.cornerRadius, range: 0...30, unit: "px")
-                sliderControl(title: "Shadow Blur", value: override.contentStyle.shadowBlur, range: 0...40, unit: "px")
-                sliderControl(title: "Shadow Opacity", value: override.contentStyle.shadowOpacity, range: 0...0.5, unit: "")
+                sliderControl(title: "Border Width", value: binding(\.contentStyle.borderWidth), range: 0...10, unit: "px")
+                sliderControl(title: "Corner Radius", value: binding(\.contentStyle.cornerRadius), range: 0...30, unit: "px")
+                sliderControl(title: "Shadow Blur", value: binding(\.contentStyle.shadowBlur), range: 0...40, unit: "px")
+                sliderControl(title: "Shadow Opacity", value: binding(\.contentStyle.shadowOpacity), range: 0...0.5, unit: "")
             }
         }
     }
     
     // MARK: - Tab 5: Cards & Elements Inspector
-    private func cardsInspector(override: Binding<PageConfigOverride>) -> some View {
+    private func cardsInspector() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             GuideCallout(
                 title: "GRID CARDS & DIRECTORY ITEMS",
@@ -883,11 +899,11 @@ public struct PageEditorView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.secondary)
                 
-                sliderControl(title: "Card Padding (Top / Bottom)", value: override.cardStyle.paddingTop, range: 4...60, unit: "px")
-                sliderControl(title: "Card Padding (Left / Right)", value: override.cardStyle.paddingLeft, range: 4...60, unit: "px")
-                sliderControl(title: "Column Gap (Spacing X)", value: override.cardStyle.spacing, range: 4...60, unit: "px")
-                sliderControl(title: "Row Gap (Spacing Y)", value: override.cardStyle.marginBottom, range: 4...60, unit: "px")
-                sliderControl(title: "Corner Radius", value: override.cardStyle.cornerRadius, range: 0...30, unit: "px")
+                sliderControl(title: "Card Padding (Top / Bottom)", value: binding(\.cardStyle.paddingTop), range: 4...60, unit: "px")
+                sliderControl(title: "Card Padding (Left / Right)", value: binding(\.cardStyle.paddingLeft), range: 4...60, unit: "px")
+                sliderControl(title: "Column Gap (Spacing X)", value: binding(\.cardStyle.spacing), range: 4...60, unit: "px")
+                sliderControl(title: "Row Gap (Spacing Y)", value: binding(\.cardStyle.marginBottom), range: 4...60, unit: "px")
+                sliderControl(title: "Corner Radius", value: binding(\.cardStyle.cornerRadius), range: 0...30, unit: "px")
             }
             
             Divider()
@@ -899,14 +915,14 @@ public struct PageEditorView: View {
                     .foregroundColor(.secondary)
                 
                 HStack(spacing: 16) {
-                    colorPickerWithHex(title: "Card Background", hex: override.cardStyle.bgColorHex)
-                    colorPickerWithHex(title: "Border Color", hex: override.cardStyle.borderColorHex)
+                    colorPickerWithHex(title: "Card Background", hex: binding(\.cardStyle.bgColorHex))
+                    colorPickerWithHex(title: "Border Color", hex: binding(\.cardStyle.borderColorHex))
                 }
                 
-                sliderControl(title: "Border Width", value: override.cardStyle.borderWidth, range: 0...8, unit: "px")
-                sliderControl(title: "Background Opacity", value: override.cardStyle.bgOpacity, range: 0.1...1.0, unit: "")
-                sliderControl(title: "Shadow Blur", value: override.cardStyle.shadowBlur, range: 0...30, unit: "px")
-                sliderControl(title: "Shadow Opacity", value: override.cardStyle.shadowOpacity, range: 0...0.5, unit: "")
+                sliderControl(title: "Border Width", value: binding(\.cardStyle.borderWidth), range: 0...8, unit: "px")
+                sliderControl(title: "Background Opacity", value: binding(\.cardStyle.bgOpacity), range: 0.1...1.0, unit: "")
+                sliderControl(title: "Shadow Blur", value: binding(\.cardStyle.shadowBlur), range: 0...30, unit: "px")
+                sliderControl(title: "Shadow Opacity", value: binding(\.cardStyle.shadowOpacity), range: 0...0.5, unit: "")
             }
             
             Divider()
@@ -917,16 +933,16 @@ public struct PageEditorView: View {
                     .fontWeight(.bold)
                     .foregroundColor(.secondary)
                 
-                sliderControl(title: "Font Size", value: override.cardStyle.fontSize, range: 10...36, unit: "px")
+                sliderControl(title: "Font Size", value: binding(\.cardStyle.fontSize), range: 10...36, unit: "px")
                 
                 HStack(spacing: 16) {
-                    colorPickerWithHex(title: "Text Color", hex: override.cardStyle.textColorHex)
+                    colorPickerWithHex(title: "Text Color", hex: binding(\.cardStyle.textColorHex))
                     
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Weight")
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                        Picker("", selection: override.cardStyle.fontWeight) {
+                        Picker("", selection: binding(\.cardStyle.fontWeight)) {
                             Text("500 Medium").tag("500")
                             Text("600 SemiBold").tag("600")
                             Text("700 Bold").tag("700")
@@ -939,8 +955,10 @@ public struct PageEditorView: View {
     }
     
     // MARK: - Tab 6: Footer & Branding Inspector
-    private func footerInspector(override: Binding<PageConfigOverride>) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
+    private func footerInspector() -> some View {
+        let isVisible = (config.pageOverrides[currentPage] ?? PageConfigOverride.defaultForPage(currentPage)).footerStyle.isVisible
+        
+        return VStack(alignment: .leading, spacing: 16) {
             GuideCallout(
                 title: "FOOTER & WATERMARK PLAQUE",
                 whatItDoes: "Configures the bottom brand badge, typography, plaque background, borders, and alignment for Page \(currentPage).",
@@ -950,10 +968,10 @@ public struct PageEditorView: View {
                 tintColor: .indigo
             )
             
-            Toggle("Show Footer on Page \(currentPage)", isOn: override.footerStyle.isVisible)
+            Toggle("Show Footer on Page \(currentPage)", isOn: binding(\.footerStyle.isVisible))
                 .font(.headline)
             
-            if override.wrappedValue.footerStyle.isVisible {
+            if isVisible {
                 Group {
                     Text("PLAQUE TEXT & TYPOGRAPHY")
                         .font(.caption)
@@ -964,18 +982,18 @@ public struct PageEditorView: View {
                         Text("Watermark Plaque Text")
                             .font(.caption2)
                             .foregroundColor(.secondary)
-                        TextField("e.g. mortalpages.com", text: override.footerStyle.text)
+                        TextField("e.g. mortalpages.com", text: binding(\.footerStyle.text))
                             .textFieldStyle(.roundedBorder)
                     }
                     
-                    sliderControl(title: "Font Size", value: override.footerStyle.fontSize, range: 8...24, unit: "px")
+                    sliderControl(title: "Font Size", value: binding(\.footerStyle.fontSize), range: 8...24, unit: "px")
                     
                     HStack(spacing: 12) {
                         VStack(alignment: .leading, spacing: 4) {
                             Text("Alignment")
                                 .font(.caption2)
                                 .foregroundColor(.secondary)
-                            Picker("", selection: override.footerStyle.alignment) {
+                            Picker("", selection: binding(\.footerStyle.alignment)) {
                                 Text("Left").tag("left")
                                 Text("Center").tag("center")
                                 Text("Right").tag("right")
@@ -994,17 +1012,17 @@ public struct PageEditorView: View {
                         .foregroundColor(.secondary)
                     
                     HStack(spacing: 16) {
-                        colorPickerWithHex(title: "Text Color", hex: override.footerStyle.textColorHex)
-                        colorPickerWithHex(title: "Plaque Background", hex: override.footerStyle.bgColorHex)
+                        colorPickerWithHex(title: "Text Color", hex: binding(\.footerStyle.textColorHex))
+                        colorPickerWithHex(title: "Plaque Background", hex: binding(\.footerStyle.bgColorHex))
                     }
                     
                     HStack(spacing: 16) {
-                        colorPickerWithHex(title: "Border Color", hex: override.footerStyle.borderColorHex)
+                        colorPickerWithHex(title: "Border Color", hex: binding(\.footerStyle.borderColorHex))
                     }
                     
-                    sliderControl(title: "Border Width", value: override.footerStyle.borderWidth, range: 0...5, unit: "px")
-                    sliderControl(title: "Corner Radius", value: override.footerStyle.cornerRadius, range: 0...20, unit: "px")
-                    sliderControl(title: "Background Opacity", value: override.footerStyle.bgOpacity, range: 0...1.0, unit: "")
+                    sliderControl(title: "Border Width", value: binding(\.footerStyle.borderWidth), range: 0...5, unit: "px")
+                    sliderControl(title: "Corner Radius", value: binding(\.footerStyle.cornerRadius), range: 0...20, unit: "px")
+                    sliderControl(title: "Background Opacity", value: binding(\.footerStyle.bgOpacity), range: 0...1.0, unit: "")
                 }
                 
                 Divider()
@@ -1018,8 +1036,10 @@ public struct PageEditorView: View {
     }
     
     // MARK: - Tab 7: Custom CSS Inspector
-    private func customCSSInspector(override: Binding<PageConfigOverride>) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+    private func customCSSInspector() -> some View {
+        let cssBinding = binding(\.customCSS)
+        
+        return VStack(alignment: .leading, spacing: 14) {
             GuideCallout(
                 title: "CUSTOM CSS INJECTION",
                 whatItDoes: "Injects raw CSS rules specifically for Page \(currentPage) without modifying global template files.",
@@ -1034,31 +1054,23 @@ public struct PageEditorView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Button("Glass Frosted Plaque") {
-                    override.wrappedValue.customCSS += "\n.watermark-plaque { backdrop-filter: blur(10px); background: rgba(255,255,255,0.7) !important; }"
-                    refreshRenderedHTML()
+                    cssBinding.wrappedValue += "\n.watermark-plaque { backdrop-filter: blur(10px); background: rgba(255,255,255,0.7) !important; }"
                 }
                 .controlSize(.mini)
                 
                 Button("Card Subtle Glow") {
-                    override.wrappedValue.customCSS += "\n.chapter-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(194,142,117,0.25) !important; }"
-                    refreshRenderedHTML()
+                    cssBinding.wrappedValue += "\n.chapter-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(194,142,117,0.25) !important; }"
                 }
                 .controlSize(.mini)
             }
             
-            TextEditor(text: Binding(
-                get: { override.wrappedValue.customCSS },
-                set: {
-                    override.wrappedValue.customCSS = $0
-                    refreshRenderedHTML()
-                }
-            ))
-            .font(.system(size: 12, design: .monospaced))
-            .frame(minHeight: 220)
-            .padding(8)
-            .background(Color(NSColor.textBackgroundColor))
-            .cornerRadius(8)
-            .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1))
+            TextEditor(text: cssBinding)
+                .font(.system(size: 12, design: .monospaced))
+                .frame(minHeight: 220)
+                .padding(8)
+                .background(Color(NSColor.textBackgroundColor))
+                .cornerRadius(8)
+                .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1))
         }
     }
     
@@ -1074,13 +1086,7 @@ public struct PageEditorView: View {
                     .font(.system(size: 11, weight: .semibold, design: .monospaced))
                     .foregroundColor(.primary)
             }
-            Slider(value: Binding(
-                get: { value.wrappedValue },
-                set: {
-                    value.wrappedValue = $0
-                    refreshRenderedHTML()
-                }
-            ), in: range)
+            Slider(value: value, in: range)
         }
     }
     
@@ -1095,22 +1101,15 @@ public struct PageEditorView: View {
                     set: { newColor in
                         if let h = newColor.toHex() {
                             hex.wrappedValue = h
-                            refreshRenderedHTML()
                         }
                     }
                 ))
                 .labelsHidden()
                 
-                TextField("#HEX", text: Binding(
-                    get: { hex.wrappedValue },
-                    set: {
-                        hex.wrappedValue = $0
-                        refreshRenderedHTML()
-                    }
-                ))
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 11, design: .monospaced))
-                .frame(width: 80)
+                TextField("#HEX", text: hex)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(width: 80)
             }
         }
     }
@@ -1171,8 +1170,14 @@ public struct PageEditorView: View {
         guard newPage >= 1 && newPage <= 188 else { return }
         currentPage = newPage
         pageInputString = "\(newPage)"
-        ensureLinksForCurrentPage()
+        ensureCurrentPageInitialized()
         refreshRenderedHTML()
+    }
+    
+    private func ensureCurrentPageInitialized() {
+        if config.pageOverrides[currentPage] == nil {
+            config.pageOverrides[currentPage] = PageConfigOverride.defaultForPage(currentPage)
+        }
     }
     
     private func ensureLinksForCurrentPage() {
@@ -1182,6 +1187,7 @@ public struct PageEditorView: View {
             let defaults = PageConfigOverride.defaultForPage(currentPage)
             config.pageOverrides[currentPage]!.linkOverrides = defaults.linkOverrides
         }
+        refreshRenderedHTML()
     }
     
     private func refreshRenderedHTML() {

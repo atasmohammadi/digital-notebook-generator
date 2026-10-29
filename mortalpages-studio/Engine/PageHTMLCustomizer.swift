@@ -182,7 +182,9 @@ public class PageHTMLCustomizer {
         if relPath.hasPrefix("Navigation/subchapter_selection_") {
             let stem = relPath.replacingOccurrences(of: "Navigation/subchapter_selection_", with: "").replacingOccurrences(of: ".html", with: "")
             currentCh = Int(stem) ?? 1
-            fileURL = templateDir.appendingPathComponent("Navigation/subchapter_selection.html")
+            if !FileManager.default.fileExists(atPath: fileURL.path) {
+                fileURL = templateDir.appendingPathComponent("Navigation/subchapter_selection.html")
+            }
         }
         
         guard var html = try? String(contentsOf: fileURL, encoding: .utf8), !html.isEmpty else {
